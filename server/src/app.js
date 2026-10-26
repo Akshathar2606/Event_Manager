@@ -35,6 +35,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Authentication and authorization routes
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authRoutes);
+
 // Root route
 app.get('/', (req, res) => {
   res.send('EventFlow API is running. Check /api/health for system status.');
