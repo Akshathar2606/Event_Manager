@@ -69,6 +69,7 @@ function request(app, { method = 'GET', url = '/', body = null, headers = {} }) 
 
       resolve({
         statusCode: res.statusCode,
+        status: res.statusCode,
         headers: res.getHeaders(),
         body: data
       });
