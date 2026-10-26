@@ -12,6 +12,7 @@ import NotFoundPage from '../pages/NotFoundPage';
 
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import AdminVenuesPage from '../pages/admin/AdminVenuesPage';
+import AdminBookingsPage from '../pages/admin/AdminBookingsPage';
 import OrganizerDashboard from '../pages/organizer/OrganizerDashboard';
 import OrganizerEventsPage from '../pages/organizer/OrganizerEventsPage';
 import OrganizerVenuesPage from '../pages/organizer/OrganizerVenuesPage';
@@ -108,7 +109,7 @@ export default function AppRoutes() {
       >
         <Route index element={<AdminDashboard />} />
         <Route path="venues" element={<AdminVenuesPage />} />
-        <Route path="bookings" element={<AdminDashboard />} />
+        <Route path="bookings" element={<AdminBookingsPage />} />
         <Route path="users" element={<AdminDashboard />} />
       </Route>
 

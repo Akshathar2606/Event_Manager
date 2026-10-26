@@ -1,6 +1,7 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Shield, Building2, CalendarCheck, Users, CheckCircle } from 'lucide-react';
+import { Shield, Building2, CalendarCheck, Users, CheckCircle, ArrowRight } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -48,17 +49,28 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
-          <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
-            <CalendarCheck className="w-5 h-5" />
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
+              <CalendarCheck className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-slate-900 text-base mb-1">Venue Booking Requests</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Review incoming requests from event organizers with atomic double-booking prevention.
+            </p>
           </div>
-          <h3 className="font-bold text-slate-900 text-base mb-1">Venue Booking Requests</h3>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            Review incoming requests from event organizers with atomic double-booking prevention.
-          </p>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-rose-600 font-medium">
-            <CheckCircle className="w-3.5 h-3.5" />
-            <span>Scheduled for Day 6 Implementation</span>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>Review Queue Active</span>
+            </div>
+            <Link
+              to="/admin/bookings"
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 inline-flex items-center gap-1 transition-colors"
+            >
+              <span>Manage</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
 
