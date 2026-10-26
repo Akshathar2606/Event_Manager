@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { Event, EVENT_STATUS } = require('../models/Event');
 const { Venue } = require('../models/Venue');
 const { User } = require('../models/User');
+const { Booking } = require('../models/Booking');
 const {
   isValidObjectId,
   validateEventInput
@@ -30,6 +31,60 @@ const getUserStore = (req) => {
   return req.app && req.app.locals && req.app.locals.mockUserStore
     ? req.app.locals.mockUserStore
     : null;
+};
+
+const getBookingStore = (req) => {
+  if (process.env.NODE_ENV === 'production') return null;
+  return req.app && req.app.locals && req.app.locals.mockBookingStore
+    ? req.app.locals.mockBookingStore
+    : null;
+};
+
+/**
+ * Verifies whether an approved, non-archived venue booking exists for an event
+ * that covers the event's complete time interval (bookingStart <= eventStart && bookingEnd >= eventEnd).
+ */
+const hasApprovedVenueBooking = async ({ eventId, venueId, startDateTime, endDateTime, req }) => {
+  if (!eventId || !venueId || !startDateTime || !endDateTime) return false;
+
+  const eventStart = new Date(startDateTime);
+  const eventEnd = new Date(endDateTime);
+  const bookingStore = getBookingStore(req);
+
+  if (bookingStore) {
+    for (const booking of bookingStore.values()) {
+      const bEventId = typeof booking.event === 'object' && booking.event ? (booking.event.id || booking.event._id) : booking.event;
+      const bVenueId = typeof booking.venue === 'object' && booking.venue ? (booking.venue.id || booking.venue._id) : booking.venue;
+
+      if (
+        String(bEventId) === String(eventId) &&
+        String(bVenueId) === String(venueId) &&
+        booking.status === 'approved' &&
+        !booking.isArchived
+      ) {
+        const bStart = new Date(booking.startDateTime);
+        const bEnd = new Date(booking.endDateTime);
+        if (bStart <= eventStart && bEnd >= eventEnd) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    const booking = await Booking.findOne({
+      event: eventId,
+      venue: venueId,
+      status: 'approved',
+      isArchived: false,
+      startDateTime: { $lte: eventStart },
+      endDateTime: { $gte: eventEnd }
+    });
+    return !!booking;
+  }
+
+  return false;
 };
 
 /**
@@ -458,6 +513,13 @@ const createEvent = async (req, res, next) => {
       }
     }
 
+    if (sanitized.status === 'published') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot create an event directly as published. Please create a draft and obtain an approved venue booking first.'
+      });
+    }
+
     // Mock store creation path
     if (mockStore) {
       const newId = new mongoose.Types.ObjectId().toString();
@@ -582,6 +644,48 @@ const updateEvent = async (req, res, next) => {
       }
     }
 
+    // Calculate effective event status, venue, and dates
+    const effectiveStatus = sanitized.status !== undefined ? sanitized.status : existingEvent.status;
+    const effectiveVenue = sanitized.venue !== undefined ? sanitized.venue : existingEvent.venue;
+    const effectiveStart = sanitized.startDateTime !== undefined ? sanitized.startDateTime : existingEvent.startDateTime;
+    const effectiveEnd = sanitized.endDateTime !== undefined ? sanitized.endDateTime : existingEvent.endDateTime;
+
+    if (effectiveStatus === 'published') {
+      const venueId = typeof effectiveVenue === 'object' && effectiveVenue
+        ? (effectiveVenue.id || effectiveVenue._id)
+        : effectiveVenue;
+
+      if (!venueId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot maintain or set published status for an event without an assigned venue. Please select a venue first.'
+        });
+      }
+
+      // Check if any publishing, venue, or scheduling details are changing or being set to published
+      const isPublishTransition = sanitized.status === 'published' && existingEvent.status !== 'published';
+      const isVenueChanged = sanitized.venue !== undefined;
+      const isDateChanged = sanitized.startDateTime !== undefined || sanitized.endDateTime !== undefined;
+
+      // If transitioning to published OR if already published and changing venue or dates:
+      if (isPublishTransition || isVenueChanged || isDateChanged) {
+        const hasApproval = await hasApprovedVenueBooking({
+          eventId: id,
+          venueId,
+          startDateTime: effectiveStart,
+          endDateTime: effectiveEnd,
+          req
+        });
+
+        if (!hasApproval) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cannot update event. An approved venue booking covering the complete event duration is required for published events.'
+          });
+        }
+      }
+    }
+
     // Mock store update path
     if (mockStore) {
       const updated = {
@@ -690,11 +794,23 @@ const updateEventStatus = async (req, res, next) => {
         });
       }
 
-      // TODO: Venue Booking Approval Check
-      // Once the Venue Booking model and administrator booking approval workflow are implemented
-      // (scheduled for Day 7), verify here that a confirmed, approved venue booking exists for this event
-      // covering the event's startDateTime and endDateTime before allowing transition to 'published'.
-      // Currently, only venue presence and existence are validated; booking approval is not yet enforced.
+      // Venue Booking Approval Enforcement:
+      // An event with an assigned venue cannot be published unless an approved, non-archived booking exists
+      // for this event and venue that covers the event's complete time interval.
+      const hasApproval = await hasApprovedVenueBooking({
+        eventId: id,
+        venueId,
+        startDateTime: existingEvent.startDateTime,
+        endDateTime: existingEvent.endDateTime,
+        req
+      });
+
+      if (!hasApproval) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot publish event. An approved venue booking covering the complete event duration is required before publishing.'
+        });
+      }
     }
 
     // Mock store update

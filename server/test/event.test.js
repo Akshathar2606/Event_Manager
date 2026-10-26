@@ -20,6 +20,7 @@ describe('EventFlow Event Management Test Suite', () => {
     app.locals.mockVenueStore = new Map();
     app.locals.mockCateringStore = new Map();
     app.locals.mockEventStore = new Map();
+    app.locals.mockBookingStore = new Map();
 
     // 1. Administrator
     adminUser = {
@@ -463,6 +464,20 @@ describe('EventFlow Event Management Test Suite', () => {
         isArchived: false
       };
       app.locals.mockEventStore.set(event1.id, event1);
+
+      const approvedBooking = {
+        id: new mongoose.Types.ObjectId().toString(),
+        event: event1.id,
+        venue: testVenue.id,
+        organizer: organizer1User.id,
+        startDateTime: event1.startDateTime,
+        endDateTime: event1.endDateTime,
+        status: 'approved',
+        isArchived: false,
+        reviewedBy: adminUser.id,
+        reviewedAt: new Date()
+      };
+      app.locals.mockBookingStore.set(approvedBooking.id, approvedBooking);
     });
 
     test('16. Organizer A cannot update Organizer B\'s event (403 Forbidden)', async () => {
@@ -710,6 +725,272 @@ describe('EventFlow Event Management Test Suite', () => {
       assert.equal(publishRes.status, 400);
       assert.equal(publishRes.body.success, false);
       assert.ok(publishRes.body.message.includes('assigned venue'));
+    });
+
+    test('27. Draft event update does not require an approved venue booking merely to remain draft', async () => {
+      const draftEventId = new mongoose.Types.ObjectId().toString();
+      const draftEvent = {
+        id: draftEventId,
+        title: 'Draft Science Workshop',
+        description: 'Workshop draft before venue approval.',
+        category: 'academic',
+        organizer: organizer1User.id,
+        venue: testVenue.id,
+        startDateTime: new Date('2026-12-05T09:00:00Z'),
+        endDateTime: new Date('2026-12-05T17:00:00Z'),
+        capacity: 40,
+        status: 'draft',
+        isArchived: false
+      };
+      app.locals.mockEventStore.set(draftEventId, draftEvent);
+
+      // Update dates without any booking in mockBookingStore
+      const updateRes = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${draftEventId}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          startDateTime: '2026-12-06T10:00:00Z',
+          endDateTime: '2026-12-06T18:00:00Z'
+        }
+      });
+
+      assert.equal(updateRes.status, 200);
+      assert.equal(updateRes.body.data.status, 'draft');
+    });
+
+    test('28. Published event date update is rejected when omitting status and no approved booking covers new dates', async () => {
+      const publishedEventId = new mongoose.Types.ObjectId().toString();
+      const publishedEvent = {
+        id: publishedEventId,
+        title: 'Published Annual Symposium',
+        description: 'Approved symposium event.',
+        category: 'academic',
+        organizer: organizer1User.id,
+        venue: testVenue.id,
+        startDateTime: new Date('2026-12-10T09:00:00Z'),
+        endDateTime: new Date('2026-12-10T17:00:00Z'),
+        capacity: 100,
+        status: 'published',
+        isArchived: false
+      };
+      app.locals.mockEventStore.set(publishedEventId, publishedEvent);
+
+      // Seed approved booking covering only original dates (Dec 10)
+      const booking = {
+        id: new mongoose.Types.ObjectId().toString(),
+        event: publishedEventId,
+        venue: testVenue.id,
+        organizer: organizer1User.id,
+        startDateTime: new Date('2026-12-10T09:00:00Z'),
+        endDateTime: new Date('2026-12-10T17:00:00Z'),
+        status: 'approved',
+        isArchived: false
+      };
+      app.locals.mockBookingStore.set(booking.id, booking);
+
+      // Update dates to Dec 11 omitting status
+      const updateRes = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${publishedEventId}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          startDateTime: '2026-12-11T09:00:00Z',
+          endDateTime: '2026-12-11T17:00:00Z'
+        }
+      });
+
+      assert.equal(updateRes.status, 400);
+      assert.match(updateRes.body.message, /approved venue booking covering the complete event duration is required/i);
+    });
+
+    test('29. Published event date update succeeds when omitting status and matching approved booking exists', async () => {
+      const publishedEventId = new mongoose.Types.ObjectId().toString();
+      const publishedEvent = {
+        id: publishedEventId,
+        title: 'Published Music Festival',
+        description: 'Approved music event.',
+        category: 'cultural',
+        organizer: organizer1User.id,
+        venue: testVenue.id,
+        startDateTime: new Date('2026-12-12T10:00:00Z'),
+        endDateTime: new Date('2026-12-12T16:00:00Z'),
+        capacity: 250,
+        status: 'published',
+        isArchived: false
+      };
+      app.locals.mockEventStore.set(publishedEventId, publishedEvent);
+
+      // Seed approved booking covering a wide window (09:00 to 18:00)
+      const booking = {
+        id: new mongoose.Types.ObjectId().toString(),
+        event: publishedEventId,
+        venue: testVenue.id,
+        organizer: organizer1User.id,
+        startDateTime: new Date('2026-12-12T09:00:00Z'),
+        endDateTime: new Date('2026-12-12T18:00:00Z'),
+        status: 'approved',
+        isArchived: false
+      };
+      app.locals.mockBookingStore.set(booking.id, booking);
+
+      // Update dates within the booking window (10:30 to 15:30) omitting status
+      const updateRes = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${publishedEventId}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          startDateTime: '2026-12-12T10:30:00Z',
+          endDateTime: '2026-12-12T15:30:00Z'
+        }
+      });
+
+      assert.equal(updateRes.status, 200);
+      assert.equal(updateRes.body.data.status, 'published');
+    });
+
+    test('30. Published event venue change is rejected when new venue has no approved booking', async () => {
+      const publishedEventId = new mongoose.Types.ObjectId().toString();
+      const publishedEvent = {
+        id: publishedEventId,
+        title: 'Published Tech Conference',
+        description: 'Approved tech conference.',
+        category: 'technical',
+        organizer: organizer1User.id,
+        venue: testVenue.id,
+        startDateTime: new Date('2026-12-15T09:00:00Z'),
+        endDateTime: new Date('2026-12-15T17:00:00Z'),
+        capacity: 100,
+        status: 'published',
+        isArchived: false
+      };
+      app.locals.mockEventStore.set(publishedEventId, publishedEvent);
+
+      // Booking only exists for testVenue, not venue2
+      const booking = {
+        id: new mongoose.Types.ObjectId().toString(),
+        event: publishedEventId,
+        venue: testVenue.id,
+        organizer: organizer1User.id,
+        startDateTime: new Date('2026-12-15T09:00:00Z'),
+        endDateTime: new Date('2026-12-15T17:00:00Z'),
+        status: 'approved',
+        isArchived: false
+      };
+      app.locals.mockBookingStore.set(booking.id, booking);
+
+      const venue2 = {
+        id: new mongoose.Types.ObjectId().toString(),
+        name: 'Secondary Auditorium',
+        location: 'Building C',
+        capacity: 200,
+        facilities: [],
+        hourlyRate: 40,
+        status: 'available',
+        isArchived: false,
+        createdBy: adminUser.id
+      };
+      app.locals.mockVenueStore.set(venue2.id, venue2);
+
+      // Attempt to switch venue to venue2 without a booking for venue2
+      const updateRes = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${publishedEventId}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          venue: venue2.id
+        }
+      });
+
+      assert.equal(updateRes.status, 400);
+      assert.match(updateRes.body.message, /approved venue booking covering the complete event duration is required/i);
+    });
+
+    test('31. Published event venue change succeeds when new venue has an approved booking covering event', async () => {
+      const publishedEventId = new mongoose.Types.ObjectId().toString();
+      const publishedEvent = {
+        id: publishedEventId,
+        title: 'Published Esports Finals',
+        description: 'Gaming finals.',
+        category: 'sports',
+        organizer: organizer1User.id,
+        venue: testVenue.id,
+        startDateTime: new Date('2026-12-20T10:00:00Z'),
+        endDateTime: new Date('2026-12-20T18:00:00Z'),
+        capacity: 100,
+        status: 'published',
+        isArchived: false
+      };
+      app.locals.mockEventStore.set(publishedEventId, publishedEvent);
+
+      const venue2 = {
+        id: new mongoose.Types.ObjectId().toString(),
+        name: 'Esports Arena',
+        location: 'Student Center Arena',
+        capacity: 300,
+        facilities: ['Gigabit LAN'],
+        hourlyRate: 80,
+        status: 'available',
+        isArchived: false,
+        createdBy: adminUser.id
+      };
+      app.locals.mockVenueStore.set(venue2.id, venue2);
+
+      // Seed approved booking for venue2
+      const booking2 = {
+        id: new mongoose.Types.ObjectId().toString(),
+        event: publishedEventId,
+        venue: venue2.id,
+        organizer: organizer1User.id,
+        startDateTime: new Date('2026-12-20T10:00:00Z'),
+        endDateTime: new Date('2026-12-20T18:00:00Z'),
+        status: 'approved',
+        isArchived: false
+      };
+      app.locals.mockBookingStore.set(booking2.id, booking2);
+
+      const updateRes = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${publishedEventId}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          venue: venue2.id
+        }
+      });
+
+      assert.equal(updateRes.status, 200);
+      assert.equal(updateRes.body.data.status, 'published');
+    });
+
+    test('32. Published event non-date/venue update (e.g. title) succeeds when omitting status', async () => {
+      const publishedEventId = new mongoose.Types.ObjectId().toString();
+      const publishedEvent = {
+        id: publishedEventId,
+        title: 'Original Title',
+        description: 'Description',
+        category: 'academic',
+        organizer: organizer1User.id,
+        venue: testVenue.id,
+        startDateTime: new Date('2026-12-22T09:00:00Z'),
+        endDateTime: new Date('2026-12-22T17:00:00Z'),
+        capacity: 100,
+        status: 'published',
+        isArchived: false
+      };
+      app.locals.mockEventStore.set(publishedEventId, publishedEvent);
+
+      const updateRes = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${publishedEventId}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          title: 'Polished Professional Title'
+        }
+      });
+
+      assert.equal(updateRes.status, 200);
+      assert.equal(updateRes.body.data.title, 'Polished Professional Title');
+      assert.equal(updateRes.body.data.status, 'published');
     });
   });
 });
