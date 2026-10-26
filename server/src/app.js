@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
 
 const app = express();
 
@@ -25,13 +26,36 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check endpoint
+// MongoDB connection state descriptor
+const DB_READY_STATE = {
+  0: 'disconnected',
+  1: 'connected',
+  2: 'connecting',
+  3: 'disconnecting'
+};
+
+// Health check endpoint: reports service health and database connectivity
 app.get('/api/health', (req, res) => {
-  res.status(200).json({
+  const readyState = mongoose.connection ? mongoose.connection.readyState : 0;
+  const isDbConnected = readyState === 1;
+  const databaseStatus = DB_READY_STATE[readyState] || 'disconnected';
+
+  if (!isDbConnected) {
+    return res.status(503).json({
+      status: 'degraded',
+      service: 'EventFlow API',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      database: databaseStatus
+    });
+  }
+
+  return res.status(200).json({
     status: 'ok',
     service: 'EventFlow API',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    database: databaseStatus
   });
 });
 
