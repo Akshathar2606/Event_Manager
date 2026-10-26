@@ -974,9 +974,58 @@ const cancelBooking = async (req, res, next) => {
     }
 
     if (mockStore) {
+      const wasApproved = booking.status === 'approved';
       booking.status = 'cancelled';
       booking.updatedAt = new Date();
       mockStore.set(id, booking);
+
+      // If an approved booking for a published event is cancelled,
+      // revert the event's status to 'draft' so it is not publicly exposed without a valid approved venue
+      if (wasApproved) {
+        const eventStore = getEventStore(req);
+        const eventId = typeof booking.event === 'object' && booking.event
+          ? (booking.event.id || booking.event._id)
+          : booking.event;
+
+        if (eventStore && eventId) {
+          const event = eventStore.get(eventId);
+          if (event && event.status === 'published') {
+            const assignedVenue = typeof event.venue === 'object' && event.venue
+              ? (event.venue.id || event.venue._id)
+              : event.venue;
+
+            // Check if another approved booking still covers the event duration
+            let otherApproved = false;
+            for (const b of mockStore.values()) {
+              const bId = b.id || b._id;
+              const bEventId = typeof b.event === 'object' && b.event ? (b.event.id || b.event._id) : b.event;
+              const bVenueId = typeof b.venue === 'object' && b.venue ? (b.venue.id || b.venue._id) : b.venue;
+              if (
+                String(bId) !== String(id) &&
+                String(bEventId) === String(eventId) &&
+                String(bVenueId) === String(assignedVenue) &&
+                b.status === 'approved' &&
+                !b.isArchived
+              ) {
+                const bStart = new Date(b.startDateTime);
+                const bEnd = new Date(b.endDateTime);
+                const eStart = new Date(event.startDateTime);
+                const eEnd = new Date(event.endDateTime);
+                if (bStart <= eStart && bEnd >= eEnd) {
+                  otherApproved = true;
+                  break;
+                }
+              }
+            }
+
+            if (!otherApproved) {
+              event.status = 'draft';
+              event.updatedAt = new Date();
+              eventStore.set(eventId, event);
+            }
+          }
+        }
+      }
 
       return res.status(200).json({
         success: true,
@@ -985,8 +1034,69 @@ const cancelBooking = async (req, res, next) => {
       });
     }
 
-    booking.status = 'cancelled';
-    await booking.save();
+    // Database path: Multi-document Transaction if MongoDB replica set is available
+    const client = mongoose.connection.client;
+    const isReplicaSet = client && client.topology && (
+      client.topology.description.type === 'ReplicaSetWithPrimary' ||
+      client.topology.description.type === 'Sharded'
+    );
+
+    let session = null;
+    if (isReplicaSet) {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    }
+
+    try {
+      const wasApproved = booking.status === 'approved';
+      booking.status = 'cancelled';
+      await booking.save({ session: session || undefined });
+
+      // If an approved booking for a published event is cancelled,
+      // revert the event's status to 'draft' atomically within the transaction
+      if (wasApproved) {
+        const eventId = typeof booking.event === 'object' && booking.event
+          ? (booking.event.id || booking.event._id)
+          : booking.event;
+
+        if (eventId) {
+          const event = await Event.findById(eventId).session(session || null);
+          if (event && event.status === 'published') {
+            const otherBooking = await Booking.findOne({
+              _id: { $ne: booking._id },
+              event: event._id,
+              venue: event.venue,
+              status: 'approved',
+              isArchived: false,
+              startDateTime: { $lte: event.startDateTime },
+              endDateTime: { $gte: event.endDateTime }
+            }).session(session || null);
+
+            if (!otherBooking) {
+              event.status = 'draft';
+              await event.save({ session: session || undefined });
+            }
+          }
+        }
+      }
+
+      if (session) {
+        await session.commitTransaction();
+      }
+    } catch (err) {
+      if (session) {
+        try {
+          await session.abortTransaction();
+        } catch (abortErr) {
+          // Ignore error on abort
+        }
+      }
+      throw err;
+    } finally {
+      if (session) {
+        await session.endSession();
+      }
+    }
 
     await booking.populate('event', 'title startDateTime endDateTime capacity status category');
     await booking.populate('venue', 'name location capacity facilities hourlyRate status');

@@ -695,7 +695,9 @@ describe('EventFlow Venue Booking Management Test Suite', () => {
       app.locals.mockBookingStore.set(approvedBooking.id, approvedBooking);
     });
 
-    test('Organizer can cancel their own pending booking', async () => {
+    test('Organizer can cancel their own pending booking without affecting event status', async () => {
+      assert.equal(validEvent1.status, 'draft');
+
       const res = await request(app, {
         method: 'PATCH',
         url: `/api/bookings/${pendingBooking.id}/cancel`,
@@ -704,9 +706,15 @@ describe('EventFlow Venue Booking Management Test Suite', () => {
 
       assert.equal(res.status, 200);
       assert.equal(res.body.data.status, 'cancelled');
+
+      // Draft event status remains untouched
+      const eventAfter = app.locals.mockEventStore.get(validEvent1.id);
+      assert.equal(eventAfter.status, 'draft');
     });
 
-    test('Organizer can cancel their own approved booking', async () => {
+    test('Cancelling an approved booking for a draft event preserves draft status', async () => {
+      assert.equal(validEvent2.status, 'draft');
+
       const res = await request(app, {
         method: 'PATCH',
         url: `/api/bookings/${approvedBooking.id}/cancel`,
@@ -715,17 +723,111 @@ describe('EventFlow Venue Booking Management Test Suite', () => {
 
       assert.equal(res.status, 200);
       assert.equal(res.body.data.status, 'cancelled');
+
+      const eventAfter = app.locals.mockEventStore.get(validEvent2.id);
+      assert.equal(eventAfter.status, 'draft');
     });
 
-    test('Organizer cannot cancel another organizer\'s booking (403 Forbidden)', async () => {
+    test('Cancelling an approved booking for a published event demotes event to draft and removes it from public discovery', async () => {
+      // 1. Set up a published event with an approved booking
+      const publishedEventId = new mongoose.Types.ObjectId().toString();
+      const publishedEvent = {
+        id: publishedEventId,
+        title: 'Published Hackathon',
+        description: 'Approved collegiate hackathon.',
+        category: 'technical',
+        organizer: organizer1User.id,
+        venue: activeVenue.id,
+        startDateTime: new Date('2026-11-28T09:00:00.000Z'),
+        endDateTime: new Date('2026-11-28T18:00:00.000Z'),
+        capacity: 100,
+        status: 'published',
+        isArchived: false
+      };
+      app.locals.mockEventStore.set(publishedEventId, publishedEvent);
+
+      const pubBooking = {
+        id: new mongoose.Types.ObjectId().toString(),
+        event: publishedEventId,
+        venue: activeVenue.id,
+        organizer: organizer1User.id,
+        startDateTime: new Date('2026-11-28T09:00:00.000Z'),
+        endDateTime: new Date('2026-11-28T18:00:00.000Z'),
+        status: 'approved',
+        reviewedBy: adminUser.id,
+        reviewedAt: new Date(),
+        isArchived: false
+      };
+      app.locals.mockBookingStore.set(pubBooking.id, pubBooking);
+
+      // Verify participant can see the published event in discovery catalog
+      const beforeDiscovery = await request(app, {
+        method: 'GET',
+        url: '/api/events',
+        headers: { authorization: `Bearer ${participantToken}` }
+      });
+      assert.equal(beforeDiscovery.status, 200);
+      assert.ok(beforeDiscovery.body.data.some((e) => e.id === publishedEventId), 'Event must be visible to participants while published');
+
+      // 2. Organizer cancels the approved booking
+      const cancelRes = await request(app, {
+        method: 'PATCH',
+        url: `/api/bookings/${pubBooking.id}/cancel`,
+        headers: { authorization: `Bearer ${organizer1Token}` }
+      });
+      assert.equal(cancelRes.status, 200);
+      assert.equal(cancelRes.body.data.status, 'cancelled');
+
+      // 3. Verify event is demoted to draft
+      const eventAfter = app.locals.mockEventStore.get(publishedEventId);
+      assert.equal(eventAfter.status, 'draft', 'Event must revert to draft when approved venue booking is cancelled');
+
+      // 4. Verify participant discovery endpoint no longer exposes the event
+      const afterDiscovery = await request(app, {
+        method: 'GET',
+        url: '/api/events',
+        headers: { authorization: `Bearer ${participantToken}` }
+      });
+      assert.equal(afterDiscovery.status, 200);
+      assert.ok(!afterDiscovery.body.data.some((e) => e.id === publishedEventId), 'Demoted event must be hidden from participant discovery');
+
+      // 5. Verify organizer still sees event as draft in their own studio
+      const organizerEvents = await request(app, {
+        method: 'GET',
+        url: '/api/events?organizer=me',
+        headers: { authorization: `Bearer ${organizer1Token}` }
+      });
+      assert.equal(organizerEvents.status, 200);
+      const myEvent = organizerEvents.body.data.find((e) => e.id === publishedEventId);
+      assert.ok(myEvent, 'Organizer must still have access to their event');
+      assert.equal(myEvent.status, 'draft');
+    });
+
+    test('Unauthorized cancellation by another organizer is rejected with 403 Forbidden', async () => {
       const res = await request(app, {
         method: 'PATCH',
         url: `/api/bookings/${approvedBooking.id}/cancel`,
-        headers: { authorization: `Bearer ${organizer1Token}` }
+        headers: { authorization: `Bearer ${organizer1Token}` } // Alice attempting to cancel Bob's booking
       });
 
       assert.equal(res.status, 403);
       assert.match(res.body.message, /cannot cancel another organizer/i);
+    });
+
+    test('Unauthorized cancellation by participant or vendor is rejected with 403 Forbidden', async () => {
+      const pRes = await request(app, {
+        method: 'PATCH',
+        url: `/api/bookings/${approvedBooking.id}/cancel`,
+        headers: { authorization: `Bearer ${participantToken}` }
+      });
+      assert.equal(pRes.status, 403);
+
+      const vRes = await request(app, {
+        method: 'PATCH',
+        url: `/api/bookings/${approvedBooking.id}/cancel`,
+        headers: { authorization: `Bearer ${vendorToken}` }
+      });
+      assert.equal(vRes.status, 403);
     });
 
     test('Administrator can cancel any booking', async () => {
@@ -739,7 +841,7 @@ describe('EventFlow Venue Booking Management Test Suite', () => {
       assert.equal(res.body.data.status, 'cancelled');
     });
 
-    test('Cannot cancel an already cancelled booking (400 Bad Request)', async () => {
+    test('Cannot cancel an already cancelled booking (400 Bad Request) on repeated attempts', async () => {
       await request(app, {
         method: 'PATCH',
         url: `/api/bookings/${pendingBooking.id}/cancel`,
@@ -754,6 +856,31 @@ describe('EventFlow Venue Booking Management Test Suite', () => {
 
       assert.equal(reCancel.status, 400);
       assert.match(reCancel.body.message, /already cancelled/i);
+    });
+
+    test('Cannot cancel a rejected booking (400 Bad Request)', async () => {
+      const rejectedBooking = {
+        id: new mongoose.Types.ObjectId().toString(),
+        event: validEvent1.id,
+        venue: activeVenue.id,
+        organizer: organizer1User.id,
+        startDateTime: validEvent1.startDateTime,
+        endDateTime: validEvent1.endDateTime,
+        status: 'rejected',
+        rejectionReason: 'Not suitable',
+        isArchived: false,
+        createdAt: new Date()
+      };
+      app.locals.mockBookingStore.set(rejectedBooking.id, rejectedBooking);
+
+      const res = await request(app, {
+        method: 'PATCH',
+        url: `/api/bookings/${rejectedBooking.id}/cancel`,
+        headers: { authorization: `Bearer ${organizer1Token}` }
+      });
+
+      assert.equal(res.status, 400);
+      assert.match(res.body.message, /cannot cancel a rejected booking/i);
     });
   });
 
