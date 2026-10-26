@@ -39,6 +39,10 @@ app.get('/api/health', (req, res) => {
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
+// Venue management routes
+const venueRoutes = require('./routes/venueRoutes');
+app.use('/api/venues', venueRoutes);
+
 // Root route
 app.get('/', (req, res) => {
   res.send('EventFlow API is running. Check /api/health for system status.');
