@@ -13,9 +13,11 @@ import NotFoundPage from '../pages/NotFoundPage';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import AdminVenuesPage from '../pages/admin/AdminVenuesPage';
 import OrganizerDashboard from '../pages/organizer/OrganizerDashboard';
+import OrganizerEventsPage from '../pages/organizer/OrganizerEventsPage';
 import OrganizerVenuesPage from '../pages/organizer/OrganizerVenuesPage';
 import OrganizerCateringPage from '../pages/organizer/OrganizerCateringPage';
 import ParticipantDashboard from '../pages/participant/ParticipantDashboard';
+import ParticipantEventsPage from '../pages/participant/ParticipantEventsPage';
 import VendorDashboard from '../pages/vendor/VendorDashboard';
 import VendorProfilePage from '../pages/vendor/VendorProfilePage';
 import VendorPackagesPage from '../pages/vendor/VendorPackagesPage';
@@ -121,7 +123,7 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<OrganizerDashboard />} />
-        <Route path="events" element={<OrganizerDashboard />} />
+        <Route path="events" element={<OrganizerEventsPage />} />
         <Route path="venues" element={<OrganizerVenuesPage />} />
         <Route path="catering" element={<OrganizerCateringPage />} />
       </Route>
@@ -137,7 +139,9 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<ParticipantDashboard />} />
+        <Route index element={<ParticipantEventsPage />} />
+        <Route path="events" element={<ParticipantEventsPage />} />
+        <Route path="dashboard" element={<ParticipantDashboard />} />
         <Route path="registrations" element={<ParticipantDashboard />} />
         <Route path="profile" element={<ParticipantDashboard />} />
       </Route>

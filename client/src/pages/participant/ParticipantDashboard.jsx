@@ -1,6 +1,7 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Compass, Ticket, Utensils, CheckCircle } from 'lucide-react';
+import { Compass, Ticket, Utensils, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 export default function ParticipantDashboard() {
   const { user } = useAuth();
@@ -21,7 +22,7 @@ export default function ParticipantDashboard() {
               Welcome, {user?.name || 'Participant'}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Browse upcoming published campus events, view schedules & catering menus, and reserve tickets
+              Browse upcoming published campus events, view schedules & catering menus, and reserve tickets.
             </p>
           </div>
 
@@ -34,45 +35,63 @@ export default function ParticipantDashboard() {
 
       {/* Participant Features Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
-            <Compass className="w-5 h-5" />
+        {/* Discover Events Card */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between hover:border-emerald-300 transition-colors">
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
+              <Compass className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-slate-900 text-base mb-1">Discover Events</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Search and filter by category (Academic, Cultural, Sports, Technical, Workshop), date, and venue.
+            </p>
           </div>
-          <h3 className="font-bold text-slate-900 text-base mb-1">Discover Events</h3>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            Search and filter by category (Academic, Cultural, Sports, Technical, Workshop), date, and venue.
-          </p>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-emerald-600 font-medium">
-            <CheckCircle className="w-3.5 h-3.5" />
-            <span>Scheduled for Day 10 Implementation</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
-            <Ticket className="w-5 h-5" />
-          </div>
-          <h3 className="font-bold text-slate-900 text-base mb-1">Event Registration</h3>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            One-click seat reservation with real-time capacity and deadline enforcement. Digital ticket view.
-          </p>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-indigo-600 font-medium">
-            <CheckCircle className="w-3.5 h-3.5" />
-            <span>Scheduled for Day 11 Implementation</span>
+          <div className="mt-6 pt-4 border-t border-slate-100">
+            <Link
+              to="/participant/events"
+              className="inline-flex items-center justify-between w-full text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+            >
+              <span>Explore Campus Directory</span>
+              <ArrowRight className="w-4 h-4 ml-1" />
+            </Link>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
-            <Utensils className="w-5 h-5" />
+        {/* Event Registration Card */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between hover:border-indigo-300 transition-colors">
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
+              <Ticket className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-slate-900 text-base mb-1">Event Registrations</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              View your confirmed registration tickets and check-in QR codes.
+            </p>
           </div>
-          <h3 className="font-bold text-slate-900 text-base mb-1">Catering & Menus</h3>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            Inspect food packages, dietary options (Veg, Non-Veg, Vegan), and service details for registered events.
-          </p>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-amber-600 font-medium">
-            <CheckCircle className="w-3.5 h-3.5" />
-            <span>Scheduled for Day 10-11 Implementation</span>
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+              <CheckCircle2 className="w-3.5 h-3.5 text-indigo-500" />
+              Day 11 Ticketing Workflow
+            </span>
+          </div>
+        </div>
+
+        {/* Catering & Menus Card */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between hover:border-amber-300 transition-colors">
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
+              <Utensils className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-slate-900 text-base mb-1">Catering & Menus</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Check buffet selections, lunch boxes, and dietary options provided at enrolled events.
+            </p>
+          </div>
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+              <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
+              Integrated with Event Details
+            </span>
           </div>
         </div>
       </div>
