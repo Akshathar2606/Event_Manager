@@ -15,6 +15,7 @@ import AdminVenuesPage from '../pages/admin/AdminVenuesPage';
 import OrganizerDashboard from '../pages/organizer/OrganizerDashboard';
 import OrganizerEventsPage from '../pages/organizer/OrganizerEventsPage';
 import OrganizerVenuesPage from '../pages/organizer/OrganizerVenuesPage';
+import OrganizerBookingsPage from '../pages/organizer/OrganizerBookingsPage';
 import OrganizerCateringPage from '../pages/organizer/OrganizerCateringPage';
 import ParticipantDashboard from '../pages/participant/ParticipantDashboard';
 import ParticipantEventsPage from '../pages/participant/ParticipantEventsPage';
@@ -125,6 +126,7 @@ export default function AppRoutes() {
         <Route index element={<OrganizerDashboard />} />
         <Route path="events" element={<OrganizerEventsPage />} />
         <Route path="venues" element={<OrganizerVenuesPage />} />
+        <Route path="bookings" element={<OrganizerBookingsPage />} />
         <Route path="catering" element={<OrganizerCateringPage />} />
       </Route>
 

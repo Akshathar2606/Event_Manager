@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, Building2, UtensilsCrossed, ArrowRight } from 'lucide-react';
+import { Calendar, Building2, UtensilsCrossed, CalendarCheck, ArrowRight } from 'lucide-react';
 
 export default function OrganizerDashboard() {
   const { user } = useAuth();
@@ -34,7 +34,7 @@ export default function OrganizerDashboard() {
       </div>
 
       {/* Organizer Workflow Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Events Card */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between hover:border-indigo-300 transition-colors">
           <div>
@@ -43,7 +43,7 @@ export default function OrganizerDashboard() {
             </div>
             <h3 className="font-bold text-slate-900 text-base mb-1">My Managed Events</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Draft new conferences, workshops, and hackathons. Configure attendee capacity, scheduling, and publish status.
+              Draft new conferences, workshops, and hackathons. Configure attendee capacity and schedules.
             </p>
           </div>
           <div className="mt-6 pt-4 border-t border-slate-100">
@@ -65,7 +65,7 @@ export default function OrganizerDashboard() {
             </div>
             <h3 className="font-bold text-slate-900 text-base mb-1">Campus Venues</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Explore available auditoriums, lecture halls, and laboratories with capacity and equipment details.
+              Explore available auditoriums, lecture halls, and laboratories with capacity details.
             </p>
           </div>
           <div className="mt-6 pt-4 border-t border-slate-100">
@@ -79,6 +79,28 @@ export default function OrganizerDashboard() {
           </div>
         </div>
 
+        {/* Venue Bookings Card */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between hover:border-indigo-300 transition-colors">
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center mb-4">
+              <CalendarCheck className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-slate-900 text-base mb-1">Venue Bookings</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Track the status of your reservation requests, review admin decisions, and manage bookings.
+            </p>
+          </div>
+          <div className="mt-6 pt-4 border-t border-slate-100">
+            <Link
+              to="/organizer/bookings"
+              className="inline-flex items-center justify-between w-full text-xs font-semibold text-violet-700 hover:text-violet-900"
+            >
+              <span>My Booking Requests</span>
+              <ArrowRight className="w-4 h-4 ml-1" />
+            </Link>
+          </div>
+        </div>
+
         {/* Catering Card */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between hover:border-amber-300 transition-colors">
           <div>
@@ -87,7 +109,7 @@ export default function OrganizerDashboard() {
             </div>
             <h3 className="font-bold text-slate-900 text-base mb-1">Catering Services</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Browse catering vendor packages, view food menus, and discover dietary options for your event attendees.
+              Browse catering vendor packages, view food menus, and discover dietary options.
             </p>
           </div>
           <div className="mt-6 pt-4 border-t border-slate-100">

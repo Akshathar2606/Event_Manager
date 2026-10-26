@@ -38,6 +38,7 @@ const ROLE_NAV_CONFIG = {
       { to: '/organizer', label: 'Organizer Hub', icon: LayoutDashboard, end: true },
       { to: '/organizer/events', label: 'My Events', icon: Calendar },
       { to: '/organizer/venues', label: 'Find Venues', icon: Building2 },
+      { to: '/organizer/bookings', label: 'Venue Bookings', icon: CalendarCheck },
       { to: '/organizer/catering', label: 'Catering Services', icon: UtensilsCrossed },
     ],
   },

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { venueService, extractErrorMessage } from '../../services/venueService';
+import RequestBookingModal from '../../components/bookings/RequestBookingModal';
 import {
   Building2,
   Search,
@@ -13,7 +15,9 @@ import {
   CheckCircle2,
   Info,
   Calendar,
-  Sparkles
+  CalendarCheck,
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 
 const COMMON_FACILITIES = [
@@ -32,6 +36,7 @@ export default function OrganizerVenuesPage() {
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1, limit: 12 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [bookingSuccessMsg, setBookingSuccessMsg] = useState(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -40,6 +45,9 @@ export default function OrganizerVenuesPage() {
 
   // Detail Modal State
   const [selectedVenue, setSelectedVenue] = useState(null);
+
+  // Request Booking Modal State
+  const [bookingVenue, setBookingVenue] = useState(null);
 
   // Fetch available venues for organizers
   const fetchVenues = useCallback(async (page = 1) => {
@@ -85,6 +93,16 @@ export default function OrganizerVenuesPage() {
     setSelectedFacilities([]);
   };
 
+  const handleBookingSuccess = (createdBooking) => {
+    setBookingVenue(null);
+    setBookingSuccessMsg(
+      'Venue booking request submitted successfully! Your request is currently pending administrator review.'
+    );
+    setTimeout(() => {
+      setBookingSuccessMsg(null);
+    }, 8000);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -105,12 +123,47 @@ export default function OrganizerVenuesPage() {
             </p>
           </div>
 
-          <div className="text-xs text-slate-400 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 shrink-0">
-            <span>Available Venues: </span>
-            <span className="font-bold text-slate-800">{pagination.total}</span>
+          <div className="flex items-center gap-3 shrink-0">
+            <Link
+              to="/organizer/bookings"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-2xs"
+            >
+              <CalendarCheck className="w-4 h-4 text-indigo-600" />
+              <span>My Booking Requests</span>
+            </Link>
+
+            <div className="text-xs text-slate-400 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200">
+              <span>Available: </span>
+              <span className="font-bold text-slate-800">{pagination.total}</span>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Booking Success Alert */}
+      {bookingSuccessMsg && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-between text-sm animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{bookingSuccessMsg}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/organizer/bookings"
+              className="text-xs font-bold text-emerald-700 underline hover:text-emerald-900"
+            >
+              View in My Bookings
+            </Link>
+            <button
+              type="button"
+              onClick={() => setBookingSuccessMsg(null)}
+              className="text-emerald-500 hover:text-emerald-700"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Error Alert */}
       {error && (
@@ -149,44 +202,45 @@ export default function OrganizerVenuesPage() {
               min="1"
               value={minCapacity}
               onChange={(e) => setMinCapacity(e.target.value)}
-              placeholder="Min. attendees (e.g. 100)"
+              placeholder="Min Attendees..."
               className="block w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
             />
           </div>
         </div>
 
-        {/* Facility Chips Bar */}
+        {/* Facilities Filter Chips */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
               Filter by Facilities
             </span>
-            {(search || minCapacity || selectedFacilities.length > 0) && (
+            {(selectedFacilities.length > 0 || search || minCapacity) && (
               <button
                 type="button"
                 onClick={clearAllFilters}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
               >
-                Reset Filters
+                Clear all filters
               </button>
             )}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {COMMON_FACILITIES.map((facility) => {
-              const isSelected = selectedFacilities.includes(facility);
+              const active = selectedFacilities.includes(facility);
               return (
                 <button
                   key={facility}
                   type="button"
                   onClick={() => toggleFacilityFilter(facility)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
-                    isSelected
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                    active
+                      ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
+                      : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  {isSelected ? '✓ ' : ''}
-                  {facility}
+                  <Tag className="w-3 h-3" />
+                  <span>{facility}</span>
                 </button>
               );
             })}
@@ -196,43 +250,40 @@ export default function OrganizerVenuesPage() {
 
       {/* Venues Grid */}
       {loading ? (
-        <div className="py-20 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center text-slate-400">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-2" />
-          <p className="text-sm font-medium">Discovering campus venues...</p>
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
+          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-3" />
+          <p className="text-xs text-slate-500 font-medium">Loading campus venues...</p>
         </div>
       ) : venues.length === 0 ? (
-        <div className="py-20 px-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs text-center">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
-            <Building2 className="w-6 h-6" />
-          </div>
-          <h3 className="font-semibold text-slate-800 text-base">No matching venues found</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            Try adjusting your search keywords, capacity requirements, or selected facilities.
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
+          <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800">No available venues found</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
+            Try adjusting your search query, minimum capacity, or facility filters.
           </p>
-          {(search || minCapacity || selectedFacilities.length > 0) && (
-            <button
-              type="button"
-              onClick={clearAllFilters}
-              className="mt-4 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
-            >
-              Clear all filters
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="px-4 py-2 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors"
+          >
+            Reset Filters
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {venues.map((venue) => (
             <div
-              key={venue.id}
-              className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
+              key={venue.id || venue._id}
+              className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 flex flex-col justify-between hover:border-indigo-300 transition-colors"
             >
               <div>
-                {/* Header */}
+                {/* Header: Name & Status */}
                 <div className="flex items-start justify-between gap-3 mb-2">
-                  <h3 className="font-bold text-slate-900 text-lg leading-snug group-hover:text-indigo-600 transition-colors">
+                  <h3 className="font-extrabold text-slate-900 text-base leading-snug">
                     {venue.name}
                   </h3>
-                  <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                    <CheckCircle2 className="w-3 h-3" />
                     Available
                   </span>
                 </div>
@@ -240,7 +291,7 @@ export default function OrganizerVenuesPage() {
                 {/* Location */}
                 <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3">
                   <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="truncate">{venue.location}</span>
+                  <span>{venue.location}</span>
                 </div>
 
                 {/* Description */}
@@ -282,16 +333,24 @@ export default function OrganizerVenuesPage() {
                 </div>
               </div>
 
-              {/* Action Button: View Details */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-[11px] text-slate-400">Campus Facility</span>
+              {/* Action Buttons: Details & Request Booking */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedVenue(venue)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
                 >
                   <Info className="w-3.5 h-3.5" />
-                  <span>View Details</span>
+                  <span>Details</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBookingVenue(venue)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors"
+                >
+                  <CalendarCheck className="w-3.5 h-3.5" />
+                  <span>Request Booking</span>
                 </button>
               </div>
             </div>
@@ -378,10 +437,7 @@ export default function OrganizerVenuesPage() {
             </div>
 
             {/* Footer */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-400">
-                Booking requests open in Day 6 Phase
-              </span>
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setSelectedVenue(null)}
@@ -389,9 +445,32 @@ export default function OrganizerVenuesPage() {
               >
                 Close
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const target = selectedVenue;
+                  setSelectedVenue(null);
+                  setBookingVenue(target);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors"
+              >
+                <CalendarCheck className="w-4 h-4" />
+                <span>Request Booking</span>
+              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Reusable Request Booking Modal */}
+      {bookingVenue && (
+        <RequestBookingModal
+          venue={bookingVenue}
+          isOpen={!!bookingVenue}
+          onClose={() => setBookingVenue(null)}
+          onSuccess={handleBookingSuccess}
+        />
       )}
     </div>
   );
