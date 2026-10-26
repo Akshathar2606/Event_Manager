@@ -11,7 +11,9 @@ import UnauthorizedPage from '../pages/auth/UnauthorizedPage';
 import NotFoundPage from '../pages/NotFoundPage';
 
 import AdminDashboard from '../pages/admin/AdminDashboard';
+import AdminVenuesPage from '../pages/admin/AdminVenuesPage';
 import OrganizerDashboard from '../pages/organizer/OrganizerDashboard';
+import OrganizerVenuesPage from '../pages/organizer/OrganizerVenuesPage';
 import ParticipantDashboard from '../pages/participant/ParticipantDashboard';
 import VendorDashboard from '../pages/vendor/VendorDashboard';
 import { Loader2 } from 'lucide-react';
@@ -99,7 +101,7 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<AdminDashboard />} />
-        <Route path="venues" element={<AdminDashboard />} />
+        <Route path="venues" element={<AdminVenuesPage />} />
         <Route path="bookings" element={<AdminDashboard />} />
         <Route path="users" element={<AdminDashboard />} />
       </Route>
@@ -117,7 +119,7 @@ export default function AppRoutes() {
       >
         <Route index element={<OrganizerDashboard />} />
         <Route path="events" element={<OrganizerDashboard />} />
-        <Route path="venues" element={<OrganizerDashboard />} />
+        <Route path="venues" element={<OrganizerVenuesPage />} />
         <Route path="catering" element={<OrganizerDashboard />} />
       </Route>
 
