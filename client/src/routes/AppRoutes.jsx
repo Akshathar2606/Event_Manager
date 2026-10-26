@@ -14,8 +14,11 @@ import AdminDashboard from '../pages/admin/AdminDashboard';
 import AdminVenuesPage from '../pages/admin/AdminVenuesPage';
 import OrganizerDashboard from '../pages/organizer/OrganizerDashboard';
 import OrganizerVenuesPage from '../pages/organizer/OrganizerVenuesPage';
+import OrganizerCateringPage from '../pages/organizer/OrganizerCateringPage';
 import ParticipantDashboard from '../pages/participant/ParticipantDashboard';
 import VendorDashboard from '../pages/vendor/VendorDashboard';
+import VendorProfilePage from '../pages/vendor/VendorProfilePage';
+import VendorPackagesPage from '../pages/vendor/VendorPackagesPage';
 import { Loader2 } from 'lucide-react';
 
 /**
@@ -120,7 +123,7 @@ export default function AppRoutes() {
         <Route index element={<OrganizerDashboard />} />
         <Route path="events" element={<OrganizerDashboard />} />
         <Route path="venues" element={<OrganizerVenuesPage />} />
-        <Route path="catering" element={<OrganizerDashboard />} />
+        <Route path="catering" element={<OrganizerCateringPage />} />
       </Route>
 
       {/* Protected Participant Routes */}
@@ -151,9 +154,9 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<VendorDashboard />} />
-        <Route path="menus" element={<VendorDashboard />} />
+        <Route path="menus" element={<VendorPackagesPage />} />
         <Route path="requests" element={<VendorDashboard />} />
-        <Route path="profile" element={<VendorDashboard />} />
+        <Route path="profile" element={<VendorProfilePage />} />
       </Route>
 
       {/* Catch-all 404 Route */}

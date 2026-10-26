@@ -43,6 +43,10 @@ app.use('/api/auth', authRoutes);
 const venueRoutes = require('./routes/venueRoutes');
 app.use('/api/venues', venueRoutes);
 
+// Catering vendor & discovery routes
+const cateringRoutes = require('./routes/cateringRoutes');
+app.use('/api/catering', cateringRoutes);
+
 // Root route
 app.get('/', (req, res) => {
   res.send('EventFlow API is running. Check /api/health for system status.');
