@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   eventService,
   EVENT_CATEGORIES,
@@ -555,7 +556,7 @@ export default function OrganizerEventsPage() {
                       <div className="flex items-center justify-between text-slate-500 text-[11px] pt-1">
                         <div className="flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Capacity: <strong className="text-slate-800">{event.capacity}</strong> attendees</span>
+                          <span>Attendees: <strong className="text-slate-800">{event.registeredCount || 0}</strong> / {event.capacity}</span>
                         </div>
                         {event.budget > 0 && (
                           <div className="flex items-center gap-1">
@@ -585,13 +586,24 @@ export default function OrganizerEventsPage() {
 
                 {/* Card Action Controls */}
                 <div className="p-4 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => handleOpenEditModal(event)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-2xs"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    <span>Edit</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleOpenEditModal(event)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-2xs"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+
+                    <Link
+                      to={`/organizer/events/${event.id}/attendees`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs shadow-2xs transition-colors"
+                      title="View Attendee Roster"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>Roster ({event.registeredCount || 0})</span>
+                    </Link>
+                  </div>
 
                   <div className="flex items-center gap-1.5">
                     {event.status === 'draft' && (

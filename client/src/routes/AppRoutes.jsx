@@ -15,11 +15,13 @@ import AdminVenuesPage from '../pages/admin/AdminVenuesPage';
 import AdminBookingsPage from '../pages/admin/AdminBookingsPage';
 import OrganizerDashboard from '../pages/organizer/OrganizerDashboard';
 import OrganizerEventsPage from '../pages/organizer/OrganizerEventsPage';
+import OrganizerEventAttendeesPage from '../pages/organizer/OrganizerEventAttendeesPage';
 import OrganizerVenuesPage from '../pages/organizer/OrganizerVenuesPage';
 import OrganizerBookingsPage from '../pages/organizer/OrganizerBookingsPage';
 import OrganizerCateringPage from '../pages/organizer/OrganizerCateringPage';
 import ParticipantDashboard from '../pages/participant/ParticipantDashboard';
 import ParticipantEventsPage from '../pages/participant/ParticipantEventsPage';
+import ParticipantRegistrationsPage from '../pages/participant/ParticipantRegistrationsPage';
 import VendorDashboard from '../pages/vendor/VendorDashboard';
 import VendorProfilePage from '../pages/vendor/VendorProfilePage';
 import VendorPackagesPage from '../pages/vendor/VendorPackagesPage';
@@ -126,6 +128,7 @@ export default function AppRoutes() {
       >
         <Route index element={<OrganizerDashboard />} />
         <Route path="events" element={<OrganizerEventsPage />} />
+        <Route path="events/:id/attendees" element={<OrganizerEventAttendeesPage />} />
         <Route path="venues" element={<OrganizerVenuesPage />} />
         <Route path="bookings" element={<OrganizerBookingsPage />} />
         <Route path="catering" element={<OrganizerCateringPage />} />
@@ -145,7 +148,7 @@ export default function AppRoutes() {
         <Route index element={<ParticipantEventsPage />} />
         <Route path="events" element={<ParticipantEventsPage />} />
         <Route path="dashboard" element={<ParticipantDashboard />} />
-        <Route path="registrations" element={<ParticipantDashboard />} />
+        <Route path="registrations" element={<ParticipantRegistrationsPage />} />
         <Route path="profile" element={<ParticipantDashboard />} />
       </Route>
 
