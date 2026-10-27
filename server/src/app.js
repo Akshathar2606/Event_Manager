@@ -83,6 +83,11 @@ app.use('/api/bookings', bookingRoutes);
 const registrationRoutes = require('./routes/registrationRoutes');
 app.use('/api/registrations', registrationRoutes);
 
+// Catering request workflow routes
+const cateringRequestRoutes = require('./routes/cateringRequestRoutes');
+app.use('/api/catering-requests', cateringRequestRoutes);
+app.use('/api/catering/requests', cateringRequestRoutes);
+
 // Root route
 app.get('/', (req, res) => {
   res.send('EventFlow API is running. Check /api/health for system status.');
