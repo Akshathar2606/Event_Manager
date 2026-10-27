@@ -83,6 +83,15 @@ const eventSchema = new mongoose.Schema(
         message: 'Capacity must be an integer'
       }
     },
+    registeredCount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Registered count cannot be negative'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'Registered count must be an integer'
+      }
+    },
     status: {
       type: String,
       enum: {

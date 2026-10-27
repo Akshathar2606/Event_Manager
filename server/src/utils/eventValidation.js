@@ -75,6 +75,10 @@ const validateEventInput = (input, isUpdate = false, existingEvent = null) => {
       errors.push('Capacity is required.');
     } else if (isNaN(numCapacity) || !Number.isInteger(numCapacity) || numCapacity < 1) {
       errors.push('Capacity must be a positive integer greater than 0.');
+    } else if (isUpdate && existingEvent && existingEvent.registeredCount !== undefined && existingEvent.registeredCount > 0) {
+      if (numCapacity < Number(existingEvent.registeredCount)) {
+        errors.push(`Cannot reduce event capacity to ${numCapacity}. There are already ${existingEvent.registeredCount} active participant registrations.`);
+      }
     }
   }
 
