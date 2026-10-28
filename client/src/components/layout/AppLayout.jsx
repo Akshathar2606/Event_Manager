@@ -40,6 +40,7 @@ const ROLE_NAV_CONFIG = {
       { to: '/organizer/venues', label: 'Find Venues', icon: Building2 },
       { to: '/organizer/bookings', label: 'Venue Bookings', icon: CalendarCheck },
       { to: '/organizer/catering', label: 'Catering Services', icon: UtensilsCrossed },
+      { to: '/organizer/catering-requests', label: 'Catering Requests', icon: ClipboardList },
     ],
   },
   participant: {
@@ -57,7 +58,7 @@ const ROLE_NAV_CONFIG = {
     links: [
       { to: '/vendor', label: 'Vendor Overview', icon: LayoutDashboard, end: true },
       { to: '/vendor/menus', label: 'Food Packages', icon: UtensilsCrossed },
-      { to: '/vendor/requests', label: 'Booking Inquiries', icon: ClipboardList },
+      { to: '/vendor/requests', label: 'Catering Requests', icon: ClipboardList },
       { to: '/vendor/profile', label: 'Vendor Profile', icon: Store },
     ],
   },
