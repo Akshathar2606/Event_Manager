@@ -63,6 +63,10 @@ app.get('/api/health', (req, res) => {
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
+// Administrator user management routes
+const userRoutes = require('./routes/userRoutes');
+app.use('/api/users', userRoutes);
+
 // Venue management routes
 const venueRoutes = require('./routes/venueRoutes');
 app.use('/api/venues', venueRoutes);
