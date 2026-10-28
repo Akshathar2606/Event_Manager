@@ -43,10 +43,10 @@ export default function AdminDashboard() {
           <p className="text-xs text-slate-500 leading-relaxed">
             Manage shared auditoriums, seminar halls, labs, and sports arenas. Set capacity and facilities.
           </p>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-indigo-600 font-medium">
-            <CheckCircle className="w-3.5 h-3.5" />
-            <span>Scheduled for Day 4 Implementation</span>
-          </div>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-emerald-600 font-medium">
+  <CheckCircle className="w-3.5 h-3.5" />
+  <span>Venue Management Active</span>
+</div>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between">
@@ -80,11 +80,20 @@ export default function AdminDashboard() {
           </div>
           <h3 className="font-bold text-slate-900 text-base mb-1">User Directory</h3>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Supervise platform accounts, assign vendor privileges, and review system access logs.
+            Search accounts by name, email, role, and status. Activate or deactivate access while preserving account history.
           </p>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-amber-600 font-medium">
-            <CheckCircle className="w-3.5 h-3.5" />
-            <span>Role Guard Active</span>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium">
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>Account Controls Active</span>
+            </div>
+            <Link
+              to="/admin/users"
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 inline-flex items-center gap-1 transition-colors"
+            >
+              <span>Manage</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
       </div>

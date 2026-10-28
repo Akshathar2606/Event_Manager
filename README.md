@@ -55,6 +55,27 @@ Event_Manager/
    npm run dev
    ```
 
+### One-Time Initial Administrator Bootstrap
+
+Public registration intentionally does not allow administrator accounts. To provision the initial administrator, run this script manually from PowerShell after confirming the backend `.env` is configured. The script uses the existing Mongoose `User` model, bcrypt hashing, and a MongoDB transaction. It refuses to run if an active administrator already exists, if the email is already registered, or if the one-time bootstrap marker already exists.
+
+From the repository root, enter the administrator name (optional), email, and password when prompted:
+
+```powershell
+$env:ADMIN_NAME = Read-Host "Administrator name (optional)"
+$env:ADMIN_EMAIL = Read-Host "Administrator email"
+$securePassword = Read-Host "Administrator password" -AsSecureString
+$env:ADMIN_PASSWORD = [System.Net.NetworkCredential]::new("", $securePassword).Password
+try {
+  npm --prefix server run bootstrap:admin
+} finally {
+  Remove-Item Env:ADMIN_NAME, Env:ADMIN_EMAIL, Env:ADMIN_PASSWORD -ErrorAction SilentlyContinue
+  Remove-Variable securePassword -ErrorAction SilentlyContinue
+}
+```
+
+The password is not echoed by the prompt. The process environment is cleared after the command, and the script clears its own credential variables on exit. Do not put credentials in source files or commit them. After a successful bootstrap, the script cannot be run a second time; future administrator onboarding must use a separate trusted process.
+
 ### Frontend Setup
 1. Navigate to the client directory:
    ```bash
