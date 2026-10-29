@@ -11,9 +11,12 @@ import {
   evaluateRegistrationEligibility,
   isEventStarted,
   isRegistrationDeadlinePassed,
-  isEventFull
+  isEventFull,
+  ACADEMIC_YEAR_OPTIONS
 } from '../../utils/registrationUtils';
 import { useAuth } from '../../context/AuthContext';
+import { getEventFeatureDetails } from '../../utils/eventFeatures';
+import { getEventContacts, getOfficialEventLinks } from '../../utils/eventContacts';
 import {
   Compass,
   Search,
@@ -21,10 +24,15 @@ import {
   Calendar,
   Clock,
   MapPin,
+  GraduationCap,
+  ClipboardCheck,
   Users,
   Tag,
   Building2,
   Mail,
+  Phone,
+  Globe,
+  Instagram,
   User,
   Ticket,
   Loader2,
@@ -82,6 +90,7 @@ export default function ParticipantEventsPage() {
   const [detailModalEvent, setDetailModalEvent] = useState(null);
   const [registeringEventId, setRegisteringEventId] = useState(null);
   const [registrationError, setRegistrationError] = useState(null);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState('');
 
   // Fetch participant's existing active registrations
   const fetchMyActiveRegistrations = useCallback(async () => {
@@ -155,9 +164,21 @@ export default function ParticipantEventsPage() {
   };
 
   // Perform event registration
-  const handleRegister = async (event) => {
+  const handleRegister = async (event, academicYear) => {
     if (!isParticipant) {
       setRegistrationError('Only participant accounts can register for campus events.');
+      return;
+    }
+    if (!ACADEMIC_YEAR_OPTIONS.some((year) => year.value === academicYear)) {
+      setRegistrationError('Select your current academic year before registering.');
+      return;
+    }
+
+    const eligibleYears = Array.isArray(event.eligibleYears)
+      ? event.eligibleYears
+      : ACADEMIC_YEAR_OPTIONS.map((year) => year.value);
+    if (!eligibleYears.includes(academicYear)) {
+      setRegistrationError('Your current academic year is not eligible for this event.');
       return;
     }
 
@@ -165,7 +186,7 @@ export default function ParticipantEventsPage() {
     setRegistrationError(null);
 
     try {
-      const result = await registrationService.registerForEvent(event.id);
+      await registrationService.registerForEvent(event.id, academicYear);
 
       // Update local registered set
       setRegisteredEventIds((prev) => new Set([...prev, String(event.id)]));
@@ -372,12 +393,12 @@ export default function ParticipantEventsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((event) => {
-            const venueName = typeof event.venue === 'object' && event.venue
-              ? event.venue.name
-              : 'Campus Venue';
-            const venueLocation = typeof event.venue === 'object' && event.venue
-              ? event.venue.location
-              : 'TBA';
+            const eventFeatures = getEventFeatureDetails(event);
+            const assignedVenue = typeof event.venue === 'object' && event.venue && !Array.isArray(event.venue)
+              ? event.venue
+              : null;
+            const venueName = assignedVenue?.name || 'Venue to be announced.';
+            const venueLocation = assignedVenue?.location || '';
             const organizerName = typeof event.organizer === 'object' && event.organizer
               ? event.organizer.name
               : 'Campus Organization';
@@ -436,37 +457,83 @@ export default function ParticipantEventsPage() {
                   </div>
 
                   {/* Event Schedule & Location */}
-                  <div className="p-5 space-y-2.5 text-xs text-slate-600">
-                    {/* Date */}
-                    <div className="flex items-center gap-2 text-slate-700 font-medium">
-                      <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>{formatDate(event.startDateTime)}</span>
-                    </div>
+                  <div className="p-5 space-y-4 text-xs text-slate-600">
+                    {/* Event schedule and venue */}
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Calendar className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800 break-words">{formatDate(event.startDateTime)}</p>
+                          <p className="mt-1 flex items-start gap-2 text-slate-500">
+                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" aria-hidden="true" />
+                            <span className="break-words">
+                              {formatTime(event.startDateTime)} – {formatTime(event.endDateTime)}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
 
-                    {/* Time */}
-                    <div className="flex items-center gap-2 text-slate-500 text-[11px]">
-                      <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{formatTime(event.startDateTime)} – {formatTime(event.endDateTime)}</span>
-                    </div>
-
-                    {/* Venue */}
-                    <div className="flex items-start gap-2 text-slate-600 text-[11px] pt-1 border-t border-slate-100">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-semibold text-slate-800">{venueName}</span>
-                        <span className="text-slate-400 block">{venueLocation}</span>
+                      <div className="flex items-start gap-3 border-t border-slate-100 pt-3">
+                        <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800 break-words">{venueName}</p>
+                          {venueLocation && (
+                            <p className="mt-0.5 text-slate-500 break-words">{venueLocation}</p>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Capacity metric */}
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Reserved:</span>
-                      </span>
-                      <span className="font-semibold text-slate-800">
-                        {event.registeredCount || 0} / {event.capacity}
-                      </span>
+                    {/* Attendance and event benefits */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+                      <div className="lg:col-span-2 flex items-center justify-between gap-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+                        <span className="flex min-w-0 items-center gap-2 text-slate-600">
+                          <Users className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+                          <span className="font-medium">Registered attendees</span>
+                        </span>
+                        <span className="shrink-0 font-bold text-slate-900 tabular-nums">
+                          {event.registeredCount ?? 0} / {event.capacity ?? 0}
+                        </span>
+                      </div>
+
+                      <div className="flex min-w-0 items-start gap-2 rounded-xl bg-indigo-50 border border-indigo-100 px-3 py-2.5">
+                        <GraduationCap className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-700 break-words">AICTE Points</p>
+                          <p className="mt-1 text-[11px] font-medium text-slate-600">
+                            {eventFeatures.aictePointsAvailable ? 'Provided' : 'Not Provided'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex min-w-0 items-start gap-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2.5">
+                        <ClipboardCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-700 break-words">Attendance</p>
+                          <p className="mt-1 text-[11px] font-medium text-slate-600">
+                            {eventFeatures.attendanceProvided ? 'Provided' : 'Not Provided'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Eligible student years */}
+                    <div className="border-t border-slate-100 pt-3">
+                      <h4 className="mb-2 font-semibold text-slate-700">Eligible Years</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {eventFeatures.eligibleYears.length === 4 ? (
+                          <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                            All Years
+                          </span>
+                        ) : eventFeatures.eligibleYears.map((year) => (
+                          <span
+                            key={year}
+                            className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-700"
+                          >
+                            {year.charAt(0).toUpperCase() + year.slice(1)} Year
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -476,6 +543,7 @@ export default function ParticipantEventsPage() {
                   <button
                     onClick={() => {
                       setRegistrationError(null);
+                      setSelectedAcademicYear('');
                       setDetailModalEvent(event);
                     }}
                     className="inline-flex items-center justify-center flex-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs shadow-2xs transition-colors"
@@ -495,7 +563,11 @@ export default function ParticipantEventsPage() {
                     <button
                       type="button"
                       disabled={!isParticipant || isStarted || isDeadlinePassed || isFull || registeringEventId === event.id}
-                      onClick={() => handleRegister(event)}
+                      onClick={() => {
+                        setRegistrationError(null);
+                        setSelectedAcademicYear('');
+                        setDetailModalEvent(event);
+                      }}
                       className={`inline-flex items-center justify-center gap-1.5 flex-1 px-3 py-2 rounded-xl font-semibold text-xs transition-colors shadow-2xs ${
                         !isParticipant || isStarted || isDeadlinePassed || isFull
                           ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed select-none'
@@ -527,11 +599,18 @@ export default function ParticipantEventsPage() {
 
       {/* EVENT DETAIL & REGISTRATION MODAL */}
       {detailModalEvent && (() => {
+        const eventFeatures = getEventFeatureDetails(detailModalEvent);
+        const eventContacts = getEventContacts(detailModalEvent);
+        const officialLinks = getOfficialEventLinks(detailModalEvent);
         const isRegistered = registeredEventIds.has(String(detailModalEvent.id));
         const isFull = isEventFull(detailModalEvent.capacity, detailModalEvent.registeredCount);
         const isStarted = isEventStarted(detailModalEvent.startDateTime);
         const isDeadlinePassed = isRegistrationDeadlinePassed(detailModalEvent.registrationDeadline);
         const seatsRemaining = Math.max(0, (detailModalEvent.capacity || 0) - (detailModalEvent.registeredCount || 0));
+        const eligibleYears = Array.isArray(detailModalEvent.eligibleYears)
+          ? detailModalEvent.eligibleYears
+          : ACADEMIC_YEAR_OPTIONS.map((year) => year.value);
+        const academicYearEligible = eligibleYears.includes(selectedAcademicYear);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs overflow-y-auto">
@@ -655,22 +734,19 @@ export default function ParticipantEventsPage() {
                   {typeof detailModalEvent.venue === 'object' && detailModalEvent.venue ? (
                     <div className="space-y-2 pt-1 text-xs">
                       <div>
-                        <div className="font-bold text-slate-800 text-sm">{detailModalEvent.venue.name}</div>
-                        <div className="text-slate-500 text-[11px] flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{detailModalEvent.venue.location}</span>
+                        <div className="font-bold text-slate-800 text-sm">
+                          {detailModalEvent.venue.name || 'Venue to be announced.'}
                         </div>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-1">
-                        <span>Venue Capacity: <strong className="text-slate-800">{detailModalEvent.venue.capacity}</strong> attendees</span>
-                        {detailModalEvent.venue.facilities?.length > 0 && (
-                          <span>Facilities: {detailModalEvent.venue.facilities.join(', ')}</span>
+                        {detailModalEvent.venue.location && (
+                          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
+                            <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{detailModalEvent.venue.location}</span>
+                          </div>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <p className="text-slate-500 text-xs">Campus Location pending coordinator confirmation.</p>
+                    <p className="text-slate-500 text-xs">Venue to be announced.</p>
                   )}
                 </div>
 
@@ -696,6 +772,95 @@ export default function ParticipantEventsPage() {
                   )}
                 </div>
 
+                {eventContacts.length > 0 && (
+                  <section className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+                    <h4 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <User className="w-4 h-4 text-emerald-600" aria-hidden="true" />
+                      <span>Contact &amp; Support</span>
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {eventContacts.map((contact, index) => (
+                        <div
+                          key={`${contact.email}-${index}`}
+                          className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 space-y-2"
+                        >
+                          <div>
+                            <p className="font-semibold text-slate-800 break-words">{contact.name}</p>
+                            {contact.role && (
+                              <p className="mt-0.5 text-[11px] text-slate-500 break-words">{contact.role}</p>
+                            )}
+                          </div>
+                          <a
+                            href={`mailto:${contact.email}`}
+                            aria-label={`Email ${contact.name}`}
+                            className="flex min-w-0 items-start gap-2 text-[11px] text-indigo-700 hover:text-indigo-900 hover:underline"
+                          >
+                            <Mail className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                            <span className="break-all">{contact.email}</span>
+                          </a>
+                          {contact.phone && (
+                            <a
+                              href={`tel:${contact.phone.replace(/[^\d+]/g, '')}`}
+                              aria-label={`Call ${contact.name}`}
+                              className="flex min-w-0 items-start gap-2 text-[11px] text-indigo-700 hover:text-indigo-900 hover:underline"
+                            >
+                              <Phone className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                              <span className="break-words">{contact.phone}</span>
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {officialLinks.length > 0 && (
+                  <section className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+                    <h4 className="font-bold text-slate-900 text-xs">Official Links</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {officialLinks.map((link) => {
+                        const Icon = link.type === 'instagram' ? Instagram : Globe;
+                        return (
+                          <a
+                            key={link.type}
+                            href={link.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Open official ${link.label} (opens in a new tab)`}
+                            className="inline-flex max-w-full items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                          >
+                            <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            <span>{link.label}</span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                {/* Student Benefits & Eligibility */}
+                <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 space-y-2">
+                  <h4 className="font-bold text-slate-900 text-xs">Student Benefits & Eligibility</h4>
+                  <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <dt className="text-slate-500">AICTE points</dt>
+                      <dd className="font-semibold text-slate-800">
+                        {eventFeatures.aictePointsAvailable ? 'Yes' : 'No'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Attendance provided</dt>
+                      <dd className="font-semibold text-slate-800">
+                        {eventFeatures.attendanceProvided ? 'Yes' : 'No'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Eligible years</dt>
+                      <dd className="font-semibold text-slate-800">{eventFeatures.eligibleYearsLabel}</dd>
+                    </div>
+                  </dl>
+                </div>
+
                 {/* Tags */}
                 {Array.isArray(detailModalEvent.tags) && detailModalEvent.tags.length > 0 && (
                   <div>
@@ -718,12 +883,43 @@ export default function ParticipantEventsPage() {
               </div>
 
               {/* Modal Footer / Registration Action */}
-              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <div className="flex flex-col gap-4 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-end sm:justify-between">
                 <div className="text-[11px] text-slate-500">
                   Capacity: <strong className="text-slate-800">{detailModalEvent.registeredCount || 0}</strong> / {detailModalEvent.capacity} booked ({seatsRemaining} left)
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+                  {!isRegistered && isParticipant && !isStarted && !isDeadlinePassed && !isFull && (
+                    <div className="min-w-0 flex-1 sm:w-48 sm:flex-none">
+                      <label
+                        htmlFor="participant-academic-year"
+                        className="mb-1 block text-[11px] font-semibold text-slate-700"
+                      >
+                        Current Academic Year
+                      </label>
+                      <select
+                        id="participant-academic-year"
+                        required
+                        value={selectedAcademicYear}
+                        onChange={(changeEvent) => {
+                          setSelectedAcademicYear(changeEvent.target.value);
+                          setRegistrationError(null);
+                        }}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                      >
+                        <option value="" disabled>Select your year</option>
+                        {ACADEMIC_YEAR_OPTIONS.map((year) => (
+                          <option key={year.value} value={year.value}>{year.label}</option>
+                        ))}
+                      </select>
+                      {selectedAcademicYear && !academicYearEligible && (
+                        <p role="alert" className="mt-1 max-w-48 text-[11px] text-rose-700">
+                          Your year is not eligible for this event.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -746,10 +942,10 @@ export default function ParticipantEventsPage() {
                   ) : (
                     <button
                       type="button"
-                      disabled={!isParticipant || isStarted || isDeadlinePassed || isFull || registeringEventId === detailModalEvent.id}
-                      onClick={() => handleRegister(detailModalEvent)}
+                      disabled={!isParticipant || isStarted || isDeadlinePassed || isFull || !selectedAcademicYear || !academicYearEligible || registeringEventId === detailModalEvent.id}
+                      onClick={() => handleRegister(detailModalEvent, selectedAcademicYear)}
                       className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold text-xs shadow-xs transition-colors ${
-                        !isParticipant || isStarted || isDeadlinePassed || isFull
+                        !isParticipant || isStarted || isDeadlinePassed || isFull || !selectedAcademicYear || !academicYearEligible
                           ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed select-none'
                           : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                       }`}
@@ -770,6 +966,7 @@ export default function ParticipantEventsPage() {
                       </span>
                     </button>
                   )}
+                  </div>
                 </div>
               </div>
             </div>

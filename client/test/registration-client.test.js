@@ -12,6 +12,8 @@ import {
   evaluateRegistrationEligibility,
   isRegistrationCancellable,
   getRegistrationStatusBadge,
+  ACADEMIC_YEAR_OPTIONS,
+  formatAcademicYear,
   formatDisplayDate,
   formatDisplayTime
 } from '../src/utils/registrationUtils.js';
@@ -19,6 +21,18 @@ import api from '../src/services/api.js';
 
 describe('Participant Registration & Attendee Workflow Tests', () => {
   describe('1. Registration Utilities & Business Rules', () => {
+    test('academic years have the four supported labels and legacy registrations are labeled safely', () => {
+      assert.deepEqual(ACADEMIC_YEAR_OPTIONS, [
+        { value: 'first', label: 'First Year' },
+        { value: 'second', label: 'Second Year' },
+        { value: 'third', label: 'Third Year' },
+        { value: 'fourth', label: 'Fourth Year' }
+      ]);
+      assert.equal(formatAcademicYear('second'), 'Second Year');
+      assert.equal(formatAcademicYear(undefined), 'Not provided');
+      assert.equal(formatAcademicYear('graduate'), 'Not provided');
+    });
+
     test('isEventStarted detects whether an event has started', () => {
       const now = new Date('2026-11-01T12:00:00.000Z');
 
@@ -217,6 +231,15 @@ describe('Participant Registration & Attendee Workflow Tests', () => {
           };
         }
 
+        if (url.endsWith('/whatsapp-group')) {
+          return {
+            data: {
+              success: true,
+              data: { whatsappGroupUrl: 'https://chat.whatsapp.com/InviteCode' }
+            }
+          };
+        }
+
         if (url.startsWith('/registrations/')) {
           const id = url.replace('/registrations/', '');
           return {
@@ -294,10 +317,11 @@ describe('Participant Registration & Attendee Workflow Tests', () => {
     });
 
     test('registerForEvent sends POST to /events/:id/register', async () => {
-      const res = await registrationService.registerForEvent('evt_101');
+      const res = await registrationService.registerForEvent('evt_101', 'second');
 
       assert.equal(interceptedRequest.method, 'POST');
       assert.equal(interceptedRequest.url, '/events/evt_101/register');
+      assert.deepEqual(interceptedRequest.data, { academicYear: 'second' });
       assert.equal(res.success, true);
       assert.equal(res.data.status, 'registered');
     });
@@ -322,6 +346,13 @@ describe('Participant Registration & Attendee Workflow Tests', () => {
       assert.equal(res.count, 2);
       assert.equal(res.pagination.total, 2);
       assert.equal(res.data.length, 2);
+    });
+
+    test('getWhatsAppGroupLink requests the protected event-specific endpoint', async () => {
+      const response = await registrationService.getWhatsAppGroupLink('event_123');
+      assert.equal(interceptedRequest.method, 'GET');
+      assert.equal(interceptedRequest.url, '/events/event_123/whatsapp-group');
+      assert.equal(response.data.whatsappGroupUrl, 'https://chat.whatsapp.com/InviteCode');
     });
 
     test('getRegistrationById requests /registrations/:id and unwraps data', async () => {

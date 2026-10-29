@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getPostLoginPath } from '../../utils/roles';
 import { Eye, EyeOff, Lock, Mail, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 export default function LoginPage() {
-  const { login, submitting, authError, clearError, getHomePath } = useAuth();
+  const { login, submitting, authError, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -56,7 +57,10 @@ export default function LoginPage() {
 
     if (result.success) {
       // If user came from a protected page, return them there; otherwise, route to role home
-      const destination = location.state?.from?.pathname || getHomePath();
+      const destination = getPostLoginPath(
+        result.user?.role,
+        location.state?.from?.pathname
+      );
       navigate(destination, { replace: true });
     }
   };
@@ -129,6 +133,12 @@ export default function LoginPage() {
                 <label htmlFor="password" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
                   Password
                 </label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                >
+                  Forgot Password?
+                </Link>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { hasAllowedRole } from '../../utils/roles';
 import { Loader2 } from 'lucide-react';
 
 export default function RoleRoute({ allowedRoles, children }) {
@@ -20,7 +21,7 @@ export default function RoleRoute({ allowedRoles, children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  const isAllowed = allowedRoles.includes(user?.role);
+  const isAllowed = hasAllowedRole(user?.role, allowedRoles);
 
   if (!isAllowed) {
     // Redirect unauthorized users to /unauthorized page with info

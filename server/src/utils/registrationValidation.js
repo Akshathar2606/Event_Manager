@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { REGISTRATION_STATUS } = require('../models/Registration');
+const { STUDENT_YEARS } = require('../models/Event');
 
 /**
  * Checks if a string is a valid MongoDB ObjectId.
@@ -18,7 +19,7 @@ const isValidObjectId = (id) => {
  */
 const validateRegistrationInput = (input) => {
   const errors = [];
-  const { event, eventId } = input || {};
+  const { event, eventId, academicYear } = input || {};
 
   const effectiveEventId = event || eventId;
 
@@ -28,11 +29,18 @@ const validateRegistrationInput = (input) => {
     errors.push('Invalid event reference ID format.');
   }
 
+  if (typeof academicYear !== 'string' || !STUDENT_YEARS.includes(academicYear)) {
+    errors.push(`Current academic year is required and must be one of: ${STUDENT_YEARS.join(', ')}.`);
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
     sanitized: {
-      event: effectiveEventId ? String(effectiveEventId) : null
+      event: effectiveEventId ? String(effectiveEventId) : null,
+      academicYear: typeof academicYear === 'string' && STUDENT_YEARS.includes(academicYear)
+        ? academicYear
+        : undefined
     }
   };
 };
@@ -99,6 +107,7 @@ const validateRegistrationQuery = (query = {}) => {
 
 module.exports = {
   isValidObjectId,
+  STUDENT_YEARS,
   validateRegistrationInput,
   validateCancellationInput,
   validateRegistrationQuery

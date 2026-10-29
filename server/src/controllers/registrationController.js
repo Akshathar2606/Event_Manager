@@ -5,6 +5,7 @@ const { User } = require('../models/User');
 const { Venue } = require('../models/Venue');
 const {
   isValidObjectId,
+  STUDENT_YEARS,
   validateRegistrationInput,
   validateCancellationInput,
   validateRegistrationQuery
@@ -40,6 +41,16 @@ const getVenueStore = (req) => {
   return req.app && req.app.locals && req.app.locals.mockVenueStore
     ? req.app.locals.mockVenueStore
     : null;
+};
+
+const getReferenceId = (reference) => {
+  if (reference === null || reference === undefined) return '';
+  if (typeof reference === 'string') return reference;
+  if (typeof reference.toHexString === 'function') return reference.toHexString();
+  if (typeof reference === 'object') {
+    return getReferenceId(reference._id !== undefined ? reference._id : reference.id);
+  }
+  return String(reference);
 };
 
 /**
@@ -202,6 +213,29 @@ const registerForEvent = async (req, res, next) => {
       });
     }
 
+    const registrationValidation = validateRegistrationInput({
+      event: effectiveEventId,
+      academicYear: req.body?.academicYear
+    });
+    if (!registrationValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed.',
+        errors: registrationValidation.errors
+      });
+    }
+
+    const academicYear = registrationValidation.sanitized.academicYear;
+    const eventEligibleYears = Array.isArray(event.eligibleYears)
+      ? event.eligibleYears
+      : STUDENT_YEARS;
+    if (!eventEligibleYears.includes(academicYear)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your current academic year is not eligible for this event.'
+      });
+    }
+
     // 3. Handle registration in Mock Store environment
     if (mockStore) {
       // Find existing registration for participant and event
@@ -234,6 +268,7 @@ const registerForEvent = async (req, res, next) => {
       // Re-registration of cancelled record
       if (existingReg && existingReg.status === 'cancelled') {
         existingReg.status = 'registered';
+        existingReg.academicYear = academicYear;
         existingReg.registeredAt = new Date();
         existingReg.cancelledAt = null;
         existingReg.cancellationReason = '';
@@ -254,6 +289,7 @@ const registerForEvent = async (req, res, next) => {
         _id: newId,
         event: effectiveEventId,
         participant: participantId,
+        academicYear,
         status: 'registered',
         registeredAt: new Date(),
         cancelledAt: null,
@@ -321,6 +357,10 @@ const registerForEvent = async (req, res, next) => {
               _id: effectiveEventId,
               status: 'published',
               isArchived: false,
+              $or: [
+                { eligibleYears: academicYear },
+                { eligibleYears: { $exists: false } }
+              ],
               $expr: {
                 $lt: [{ $ifNull: ['$registeredCount', 0] }, '$capacity']
               }
@@ -330,6 +370,20 @@ const registerForEvent = async (req, res, next) => {
           );
 
           if (!updatedEvent) {
+            const currentEvent = await Event.findOne({
+              _id: effectiveEventId,
+              isArchived: false
+            }).select('eligibleYears').session(session);
+            const currentEligibleYears = currentEvent && Array.isArray(currentEvent.eligibleYears)
+              ? currentEvent.eligibleYears
+              : STUDENT_YEARS;
+            if (currentEvent && !currentEligibleYears.includes(academicYear)) {
+              await session.abortTransaction();
+              return res.status(400).json({
+                success: false,
+                message: 'Your current academic year is not eligible for this event.'
+              });
+            }
             await session.abortTransaction();
             return res.status(400).json({
               success: false,
@@ -341,6 +395,7 @@ const registerForEvent = async (req, res, next) => {
           if (existingRegistration && existingRegistration.status === 'cancelled') {
             wasCancelled = true;
             existingRegistration.status = 'registered';
+            existingRegistration.academicYear = academicYear;
             existingRegistration.registeredAt = new Date();
             existingRegistration.cancelledAt = null;
             existingRegistration.cancellationReason = '';
@@ -353,6 +408,7 @@ const registerForEvent = async (req, res, next) => {
                 {
                   event: effectiveEventId,
                   participant: participantId,
+                  academicYear,
                   status: 'registered',
                   registeredAt: new Date()
                 }
@@ -913,10 +969,75 @@ const getEventAttendees = async (req, res, next) => {
   }
 };
 
+const getWhatsAppGroupLink = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid event ID format.'
+      });
+    }
+
+    const eventStore = getEventStore(req);
+    const registrationStore = getStore(req);
+    let event;
+    let activeRegistration;
+
+    if (eventStore && registrationStore) {
+      event = eventStore.get(id);
+      if (!event || event.isArchived) {
+        return res.status(404).json({ success: false, message: 'Event not found.' });
+      }
+
+      activeRegistration = Array.from(registrationStore.values()).find((registration) =>
+        getReferenceId(registration.event) === id &&
+        getReferenceId(registration.participant) === req.user.id &&
+        registration.status === 'registered' &&
+        registration.isArchived === false
+      );
+    } else {
+      event = await Event.findOne({ _id: id, isArchived: false }).select('whatsappGroupUrl');
+      if (!event) {
+        return res.status(404).json({ success: false, message: 'Event not found.' });
+      }
+
+      activeRegistration = await Registration.findOne({
+        event: id,
+        participant: req.user.id,
+        status: 'registered',
+        isArchived: false
+      }).select('_id');
+    }
+
+    if (!activeRegistration) {
+      return res.status(403).json({
+        success: false,
+        message: 'An active registration is required to access this event group.'
+      });
+    }
+
+    if (typeof event.whatsappGroupUrl !== 'string' || !event.whatsappGroupUrl) {
+      return res.status(404).json({
+        success: false,
+        message: 'No WhatsApp group is available for this event.'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { whatsappGroupUrl: event.whatsappGroupUrl }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerForEvent,
   getMyRegistrations,
   getRegistrationById,
   cancelRegistration,
-  getEventAttendees
+  getEventAttendees,
+  getWhatsAppGroupLink
 };

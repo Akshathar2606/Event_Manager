@@ -13,6 +13,16 @@ const EVENT_CATEGORIES = [
 ];
 
 const EVENT_STATUS = ['draft', 'published', 'cancelled'];
+const STUDENT_YEARS = ['first', 'second', 'third', 'fourth'];
+const eventContactSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    role: { type: String, trim: true, default: '', maxlength: 100 },
+    email: { type: String, required: true, trim: true, lowercase: true },
+    phone: { type: String, trim: true, default: '' }
+  },
+  { _id: false, strict: 'throw' }
+);
 
 const eventSchema = new mongoose.Schema(
   {
@@ -38,6 +48,43 @@ const eventSchema = new mongoose.Schema(
       },
       lowercase: true,
       trim: true
+    },
+    aictePointsAvailable: {
+      type: Boolean,
+      default: false
+    },
+    attendanceProvided: {
+      type: Boolean,
+      default: false
+    },
+    eligibleYears: {
+      type: [{
+        type: String,
+        enum: {
+          values: STUDENT_YEARS,
+          message: '{VALUE} is not a valid student year.'
+        }
+      }],
+      default: () => [...STUDENT_YEARS]
+    },
+    contacts: {
+      type: [eventContactSchema],
+      default: []
+    },
+    websiteUrl: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    instagramUrl: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    whatsappGroupUrl: {
+      type: String,
+      trim: true,
+      default: ''
     },
     organizer: {
       type: mongoose.Schema.Types.ObjectId,
@@ -152,5 +199,6 @@ const Event = mongoose.model('Event', eventSchema);
 module.exports = {
   Event,
   EVENT_CATEGORIES,
-  EVENT_STATUS
+  EVENT_STATUS,
+  STUDENT_YEARS
 };

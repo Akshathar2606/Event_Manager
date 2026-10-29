@@ -2,10 +2,25 @@ const { test, describe, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
 const app = require('../src/app');
-const { request } = require('./testHelper');
+const { request: dispatchRequest } = require('./testHelper');
 const { signToken } = require('../src/utils/token');
 const { Registration, REGISTRATION_STATUS } = require('../src/models/Registration');
 const { Event } = require('../src/models/Event');
+
+const request = (appInstance, options) => {
+  const isRegistrationRequest =
+    options.method === 'POST' &&
+    (options.url === '/api/registrations' || options.url.endsWith('/register'));
+  if (!isRegistrationRequest) return dispatchRequest(appInstance, options);
+
+  return dispatchRequest(appInstance, {
+    ...options,
+    body: {
+      ...(options.body || {}),
+      academicYear: options.body?.academicYear ?? 'first'
+    }
+  });
+};
 
 describe('EventFlow Participant Event Registration Test Suite', () => {
   let adminUser, adminToken;
@@ -251,12 +266,31 @@ describe('EventFlow Participant Event Registration Test Suite', () => {
       assert.ok(err.errors.participant);
     });
 
+    test('academicYear accepts only the four supported year values', () => {
+      for (const academicYear of ['first', 'second', 'third', 'fourth']) {
+        const registration = new Registration({
+          event: new mongoose.Types.ObjectId(),
+          participant: new mongoose.Types.ObjectId(),
+          academicYear
+        });
+        assert.equal(registration.validateSync(), undefined);
+      }
+
+      const invalid = new Registration({
+        event: new mongoose.Types.ObjectId(),
+        participant: new mongoose.Types.ObjectId(),
+        academicYear: 'graduate'
+      });
+      assert.ok(invalid.validateSync().errors.academicYear);
+    });
+
     test('Default status is "registered" and timestamps default sensibly', () => {
       const reg = new Registration({
         event: new mongoose.Types.ObjectId(),
         participant: new mongoose.Types.ObjectId()
       });
       assert.equal(reg.status, 'registered');
+      assert.equal(reg.academicYear, undefined);
       assert.ok(reg.registeredAt);
       assert.equal(reg.cancelledAt, null);
     });
@@ -386,6 +420,105 @@ describe('EventFlow Participant Event Registration Test Suite', () => {
       assert.match(res.body.message, /maximum capacity/i);
     });
 
+    test('New registration rejects a missing academic year', async () => {
+      const res = await dispatchRequest(app, {
+        method: 'POST',
+        url: `/api/events/${publishedEvent.id}/register`,
+        headers: { authorization: 'Bearer ' + participant1Token }
+      });
+
+      assert.equal(res.status, 400);
+      assert.ok(res.body.errors.some((error) => /academic year is required/i.test(error)));
+      assert.equal(publishedEvent.registeredCount, 0);
+    });
+
+    test('New registration rejects an invalid academic year', async () => {
+      const res = await request(app, {
+        method: 'POST',
+        url: `/api/events/${publishedEvent.id}/register`,
+        headers: { authorization: 'Bearer ' + participant1Token },
+        body: { academicYear: 'graduate' }
+      });
+
+      assert.equal(res.status, 400);
+      assert.ok(res.body.errors.some((error) => /academic year is required/i.test(error)));
+      assert.equal(publishedEvent.registeredCount, 0);
+    });
+
+    test('All four academic years may register when the event is eligible for all four', async () => {
+      publishedEvent.eligibleYears = ['first', 'second', 'third', 'fourth'];
+      const cases = [
+        ['first', participant1User],
+        ['second', participant2User],
+        ['third', {
+          id: new mongoose.Types.ObjectId().toString(),
+          name: 'Third Year Student',
+          role: 'participant',
+          isActive: true
+        }],
+        ['fourth', {
+          id: new mongoose.Types.ObjectId().toString(),
+          name: 'Fourth Year Student',
+          role: 'participant',
+          isActive: true
+        }]
+      ];
+
+      for (const [academicYear, user] of cases) {
+        app.locals.mockUserStore.set(user.id, user);
+        const res = await request(app, {
+          method: 'POST',
+          url: `/api/events/${publishedEvent.id}/register`,
+          headers: { authorization: 'Bearer ' + signToken(user) },
+          body: { academicYear }
+        });
+        assert.equal(res.status, 201, `${academicYear} registration should succeed`);
+        assert.equal(res.body.data.academicYear, academicYear);
+      }
+      assert.equal(publishedEvent.registeredCount, 4);
+    });
+
+    test('First Year may join a First Year event; Third Year is denied by event eligibility', async () => {
+      publishedEvent.eligibleYears = ['first'];
+      const firstYearRes = await request(app, {
+        method: 'POST',
+        url: `/api/events/${publishedEvent.id}/register`,
+        headers: { authorization: 'Bearer ' + participant1Token },
+        body: { academicYear: 'first' }
+      });
+      assert.equal(firstYearRes.status, 201);
+
+      const thirdYearUser = {
+        id: new mongoose.Types.ObjectId().toString(),
+        name: 'Third Year Student',
+        role: 'participant',
+        isActive: true
+      };
+      app.locals.mockUserStore.set(thirdYearUser.id, thirdYearUser);
+      const thirdYearRes = await request(app, {
+        method: 'POST',
+        url: `/api/events/${publishedEvent.id}/register`,
+        headers: { authorization: 'Bearer ' + signToken(thirdYearUser) },
+        body: { academicYear: 'third' }
+      });
+
+      assert.equal(thirdYearRes.status, 400);
+      assert.match(thirdYearRes.body.message, /academic year is not eligible/i);
+      assert.equal(publishedEvent.registeredCount, 1);
+    });
+
+    test('Legacy events without eligibleYears allow registration for any valid year', async () => {
+      delete publishedEvent.eligibleYears;
+      const res = await request(app, {
+        method: 'POST',
+        url: `/api/events/${publishedEvent.id}/register`,
+        headers: { authorization: 'Bearer ' + participant1Token },
+        body: { academicYear: 'third' }
+      });
+      assert.equal(res.status, 201);
+      assert.equal(res.body.data.academicYear, 'third');
+    });
+
     test('Participant successfully registers via POST /api/events/:id/register and increments registeredCount', async () => {
       assert.equal(publishedEvent.registeredCount, 0);
 
@@ -437,6 +570,122 @@ describe('EventFlow Participant Event Registration Test Suite', () => {
       assert.match(res2.body.message, /already registered/i);
       // Ensure counter was not incremented
       assert.equal(publishedEvent.registeredCount, 1);
+    });
+  });
+
+  describe('WhatsApp Group Invite Access', () => {
+    const seedActiveRegistration = ({
+      eventId = publishedEvent.id,
+      participantId = participant1User.id,
+      status = 'registered',
+      isArchived = false
+    } = {}) => {
+      const registrationId = new mongoose.Types.ObjectId().toString();
+      app.locals.mockRegistrationStore.set(registrationId, {
+        id: registrationId,
+        _id: registrationId,
+        event: new mongoose.Types.ObjectId(eventId),
+        participant: new mongoose.Types.ObjectId(participantId),
+        status,
+        isArchived
+      });
+      return registrationId;
+    };
+
+    test('An actively registered participant can retrieve the event WhatsApp link', async () => {
+      publishedEvent.whatsappGroupUrl = 'https://chat.whatsapp.com/ActiveInvite';
+      seedActiveRegistration();
+
+      const res = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/whatsapp-group`,
+        headers: { authorization: 'Bearer ' + participant1Token }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.data.whatsappGroupUrl, publishedEvent.whatsappGroupUrl);
+    });
+
+    test('An unregistered or different participant cannot retrieve the link', async () => {
+      publishedEvent.whatsappGroupUrl = 'https://chat.whatsapp.com/ActiveInvite';
+      seedActiveRegistration();
+
+      const unregisteredRes = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/whatsapp-group`,
+        headers: { authorization: 'Bearer ' + participant2Token }
+      });
+      assert.equal(unregisteredRes.status, 403);
+
+      app.locals.mockRegistrationStore.clear();
+      seedActiveRegistration({ participantId: participant2User.id });
+      const otherParticipantRes = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/whatsapp-group`,
+        headers: { authorization: 'Bearer ' + participant1Token }
+      });
+      assert.equal(otherParticipantRes.status, 403);
+    });
+
+    test('Cancelled and archived registrations do not grant access', async () => {
+      publishedEvent.whatsappGroupUrl = 'https://chat.whatsapp.com/ActiveInvite';
+      seedActiveRegistration({ status: 'cancelled' });
+
+      let res = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/whatsapp-group`,
+        headers: { authorization: 'Bearer ' + participant1Token }
+      });
+      assert.equal(res.status, 403);
+
+      app.locals.mockRegistrationStore.clear();
+      seedActiveRegistration({ isArchived: true });
+      res = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/whatsapp-group`,
+        headers: { authorization: 'Bearer ' + participant1Token }
+      });
+      assert.equal(res.status, 403);
+    });
+
+    test('Events without a group link, invalid event IDs, and missing events are handled safely', async () => {
+      seedActiveRegistration();
+      const noLinkRes = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/whatsapp-group`,
+        headers: { authorization: 'Bearer ' + participant1Token }
+      });
+      assert.equal(noLinkRes.status, 404);
+      assert.match(noLinkRes.body.message, /no WhatsApp group/i);
+
+      const invalidIdRes = await request(app, {
+        method: 'GET',
+        url: '/api/events/not-an-object-id/whatsapp-group',
+        headers: { authorization: 'Bearer ' + participant1Token }
+      });
+      assert.equal(invalidIdRes.status, 400);
+
+      const missingEventRes = await request(app, {
+        method: 'GET',
+        url: `/api/events/${new mongoose.Types.ObjectId()}/whatsapp-group`,
+        headers: { authorization: 'Bearer ' + participant1Token }
+      });
+      assert.equal(missingEventRes.status, 404);
+    });
+
+    test('Only authenticated participants may use the protected link endpoint', async () => {
+      const noToken = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/whatsapp-group`
+      });
+      assert.equal(noToken.status, 401);
+
+      const organizerRes = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/whatsapp-group`,
+        headers: { authorization: 'Bearer ' + organizer1Token }
+      });
+      assert.equal(organizerRes.status, 403);
     });
   });
 
@@ -585,6 +834,7 @@ describe('EventFlow Participant Event Registration Test Suite', () => {
       assert.equal(reRegRes.body.success, true);
       assert.equal(reRegRes.body.data.status, 'registered');
       assert.equal(reRegRes.body.data.cancelledAt, null);
+      assert.equal(reRegRes.body.data.academicYear, 'first');
       assert.equal(publishedEvent.registeredCount, 1);
       // Critical check: Exactly 1 record remains in store (no duplicates created)
       assert.equal(app.locals.mockRegistrationStore.size, 1);
@@ -848,6 +1098,22 @@ describe('EventFlow Participant Event Registration Test Suite', () => {
       assert.ok(attendee.participant.email);
       assert.equal(attendee.participant.passwordHash, undefined);
       assert.equal(attendee.participant.password, undefined);
+    });
+
+    test('Organizer attendee view includes the saved academic year and tolerates legacy registrations', async () => {
+      const registrations = Array.from(app.locals.mockRegistrationStore.values());
+      const legacyRegistration = registrations[0];
+      delete legacyRegistration.academicYear;
+
+      const res = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees`,
+        headers: { authorization: 'Bearer ' + organizer1Token }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.data.find((registration) => registration.id === legacyRegistration.id).academicYear, undefined);
+      assert.ok(res.body.data.some((registration) => registration.academicYear === 'first'));
     });
 
     test('Administrator can view attendee list for any event', async () => {

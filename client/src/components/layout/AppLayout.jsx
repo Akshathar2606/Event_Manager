@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { normalizeRole } from '../../utils/roles';
 import {
   LayoutDashboard,
   Building2,
@@ -69,7 +70,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const roleConfig = (user && ROLE_NAV_CONFIG[user.role]) || ROLE_NAV_CONFIG.participant;
+  const roleConfig = (user && ROLE_NAV_CONFIG[normalizeRole(user.role)]) || ROLE_NAV_CONFIG.participant;
   const userInitials = user?.name
     ? user.name
         .split(' ')

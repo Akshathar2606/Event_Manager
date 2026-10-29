@@ -265,6 +265,43 @@ describe('EventFlow Venue Booking Management Test Suite', () => {
       assert.match(res.body.message, /only request venue bookings for events you organize/i);
     });
 
+    test('Organizer can request booking when event owner and venue references are BSON ObjectIds', async () => {
+      validEvent1.organizer = new mongoose.Types.ObjectId(organizer1User.id);
+      validEvent1.venue = new mongoose.Types.ObjectId(activeVenue.id);
+
+      const res = await request(app, {
+        method: 'POST',
+        url: '/api/bookings',
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          event: validEvent1.id,
+          venue: activeVenue.id
+        }
+      });
+
+      assert.equal(res.status, 201);
+      assert.equal(res.body.success, true);
+      assert.equal(res.body.data.organizer.id, organizer1User.id);
+      assert.equal(res.body.data.event.id, validEvent1.id);
+    });
+
+    test('Organizer cannot request booking for another owner stored as a BSON ObjectId', async () => {
+      validEvent1.organizer = new mongoose.Types.ObjectId(organizer1User.id);
+
+      const res = await request(app, {
+        method: 'POST',
+        url: '/api/bookings',
+        headers: { authorization: `Bearer ${organizer2Token}` },
+        body: {
+          event: validEvent1.id,
+          venue: activeVenue.id
+        }
+      });
+
+      assert.equal(res.status, 403);
+      assert.match(res.body.message, /only request venue bookings for events you organize/i);
+    });
+
     test('Reject booking for non-existent or invalid event reference ID (400 or 404)', async () => {
       const invalidIdRes = await request(app, {
         method: 'POST',
@@ -549,6 +586,37 @@ describe('EventFlow Venue Booking Management Test Suite', () => {
       assert.ok(res.body.data.reviewedAt);
     });
 
+    test('Admin approves booking with BSON ObjectId event and venue references', async () => {
+      pendingBooking1.event = new mongoose.Types.ObjectId(validEvent1.id);
+      pendingBooking1.venue = new mongoose.Types.ObjectId(activeVenue.id);
+
+      const res = await request(app, {
+        method: 'PATCH',
+        url: `/api/bookings/${pendingBooking1.id}/approve`,
+        headers: { authorization: `Bearer ${adminToken}` }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.success, true);
+      assert.equal(res.body.data.status, 'approved');
+      assert.equal(res.body.data.event.id, validEvent1.id);
+      assert.equal(res.body.data.venue.id, activeVenue.id);
+    });
+
+    test('Approval reports a missing event for an ObjectId reference without a cast error', async () => {
+      pendingBooking1.event = new mongoose.Types.ObjectId();
+
+      const res = await request(app, {
+        method: 'PATCH',
+        url: `/api/bookings/${pendingBooking1.id}/approve`,
+        headers: { authorization: `Bearer ${adminToken}` }
+      });
+
+      assert.equal(res.status, 400);
+      assert.match(res.body.message, /associated event no longer exists/i);
+      assert.equal(pendingBooking1.status, 'pending');
+    });
+
     test('Double-booking protection: Approving conflicting overlapping booking is rejected with 409 Conflict', async () => {
       // 1. Approve Booking 1 (10:00 - 16:00)
       const approveRes1 = await request(app, {
@@ -659,6 +727,23 @@ describe('EventFlow Venue Booking Management Test Suite', () => {
       assert.equal(res.body.data.status, 'rejected');
       assert.equal(res.body.data.rejectionReason, 'Auditorium reserved for university convocation.');
       assert.equal(res.body.data.reviewedBy.id, adminUser.id);
+    });
+
+    test('Admin can reject booking with BSON ObjectId event and venue references', async () => {
+      pendingBooking1.event = new mongoose.Types.ObjectId(validEvent1.id);
+      pendingBooking1.venue = new mongoose.Types.ObjectId(activeVenue.id);
+
+      const res = await request(app, {
+        method: 'PATCH',
+        url: `/api/bookings/${pendingBooking1.id}/reject`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        body: { rejectionReason: 'Venue unavailable for this event.' }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.data.status, 'rejected');
+      assert.equal(res.body.data.event.id, validEvent1.id);
+      assert.equal(res.body.data.venue.id, activeVenue.id);
     });
   });
 

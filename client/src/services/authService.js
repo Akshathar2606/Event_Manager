@@ -59,6 +59,22 @@ export const authService = {
   },
 
   /**
+   * Requests password-recovery instructions without changing the active session.
+   */
+  async requestPasswordReset({ email }) {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  /**
+   * Resets a password using a one-time token held only in the current page state.
+   */
+  async resetPassword({ token, newPassword }) {
+    const response = await api.post('/auth/reset-password', { token, newPassword });
+    return response.data;
+  },
+
+  /**
    * Clears the stored token from memory and sessionStorage.
    */
   logout() {

@@ -7,6 +7,8 @@ import AppLayout from '../components/layout/AppLayout';
 
 import LoginPage from '../pages/auth/LoginPage';
 import RegisterPage from '../pages/auth/RegisterPage';
+import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
 import UnauthorizedPage from '../pages/auth/UnauthorizedPage';
 import NotFoundPage from '../pages/NotFoundPage';
 
@@ -96,6 +98,14 @@ export default function AppRoutes() {
             <RegisterPage />
           </PublicOnlyRoute>
         }
+      />
+      <Route
+        path="/forgot-password"
+        element={<ForgotPasswordPage />}
+      />
+      <Route
+        path="/reset-password"
+        element={<ResetPasswordPage />}
       />
 
       {/* Access Denied / 403 Page */}

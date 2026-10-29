@@ -40,6 +40,30 @@ const getBookingStore = (req) => {
     : null;
 };
 
+const getReferenceId = (reference) => {
+  if (reference === null || reference === undefined) return '';
+  if (typeof reference === 'string') return reference;
+  if (typeof reference.toHexString === 'function') return reference.toHexString();
+  if (typeof reference === 'object') {
+    return getReferenceId(reference._id !== undefined ? reference._id : reference.id);
+  }
+  return String(reference);
+};
+
+const eventForReadResponse = (event, user) => {
+  const serialized = event && typeof event.toObject === 'function'
+    ? event.toObject()
+    : { ...event };
+  const isOwnerOrganizer =
+    user &&
+    user.role === 'organizer' &&
+    getReferenceId(event.organizer) === user.id;
+  if (!user || (user.role !== 'administrator' && !isOwnerOrganizer)) {
+    delete serialized.whatsappGroupUrl;
+  }
+  return serialized;
+};
+
 /**
  * Verifies whether an approved, non-archived venue booking exists for an event
  * that covers the event's complete time interval (bookingStart <= eventStart && bookingEnd >= eventEnd).
@@ -334,7 +358,9 @@ const getEvents = async (req, res, next) => {
       list.sort((a, b) => new Date(a.startDateTime) - new Date(b.startDateTime));
 
       const total = list.length;
-      const paginated = list.slice(skip, skip + limitNum).map((e) => populateMockEvent(e, req));
+      const paginated = list
+        .slice(skip, skip + limitNum)
+        .map((event) => eventForReadResponse(populateMockEvent(event, req), user));
 
       return res.status(200).json({
         success: true,
@@ -378,7 +404,7 @@ const getEvents = async (req, res, next) => {
         pages: Math.ceil(total / limitNum) || 1,
         limit: limitNum
       },
-      data: events
+      data: events.map((event) => eventForReadResponse(event, user))
     });
   } catch (error) {
     next(error);
@@ -430,7 +456,7 @@ const getEventById = async (req, res, next) => {
 
       return res.status(200).json({
         success: true,
-        data: populateMockEvent(event, req)
+        data: eventForReadResponse(populateMockEvent(event, req), user)
       });
     }
 
@@ -461,7 +487,7 @@ const getEventById = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      data: event
+      data: eventForReadResponse(event, user)
     });
   } catch (error) {
     next(error);
@@ -600,11 +626,9 @@ const updateEvent = async (req, res, next) => {
     }
 
     // Ownership check
-    const orgId = typeof existingEvent.organizer === 'object'
-      ? (existingEvent.organizer.id || existingEvent.organizer._id)
-      : existingEvent.organizer;
+    const orgId = getReferenceId(existingEvent.organizer);
 
-    if (!isAdmin && String(orgId) !== req.user.id) {
+    if (!isAdmin && orgId !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Forbidden. You are not authorized to update this event.'
@@ -763,9 +787,7 @@ const updateEventStatus = async (req, res, next) => {
     }
 
     // Ownership check
-    const orgId = typeof existingEvent.organizer === 'object'
-      ? (existingEvent.organizer.id || existingEvent.organizer._id)
-      : existingEvent.organizer;
+    const orgId = getReferenceId(existingEvent.organizer);
 
     if (!isAdmin && String(orgId) !== req.user.id) {
       return res.status(403).json({
@@ -783,9 +805,7 @@ const updateEventStatus = async (req, res, next) => {
         });
       }
 
-      const venueId = typeof existingEvent.venue === 'object' && existingEvent.venue
-        ? (existingEvent.venue.id || existingEvent.venue._id)
-        : existingEvent.venue;
+      const venueId = getReferenceId(existingEvent.venue);
 
       if (!venueId) {
         return res.status(400).json({
@@ -878,9 +898,7 @@ const deleteEvent = async (req, res, next) => {
     }
 
     // Ownership check
-    const orgId = typeof existingEvent.organizer === 'object'
-      ? (existingEvent.organizer.id || existingEvent.organizer._id)
-      : existingEvent.organizer;
+    const orgId = getReferenceId(existingEvent.organizer);
 
     if (!isAdmin && String(orgId) !== req.user.id) {
       return res.status(403).json({

@@ -4,6 +4,7 @@ import { registrationService } from '../../services/registrationService';
 import { eventService } from '../../services/eventService';
 import {
   getRegistrationStatusBadge,
+  formatAcademicYear,
   formatDisplayDate,
   formatDisplayTime
 } from '../../utils/registrationUtils';
@@ -315,6 +316,7 @@ export default function OrganizerEventAttendeesPage() {
                       <th className="py-3 px-4">Participant</th>
                       <th className="py-3 px-4">Contact</th>
                       <th className="py-3 px-4">Organization / Dept</th>
+                      <th className="py-3 px-4">Academic Year</th>
                       <th className="py-3 px-4">Registered Date</th>
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4">Ticket Ref</th>
@@ -356,6 +358,11 @@ export default function OrganizerEventAttendeesPage() {
                             <span className="text-slate-600">
                               {participant.organization || '—'}
                             </span>
+                          </td>
+
+                          {/* Academic Year */}
+                          <td className="py-3.5 px-4">
+                            <span className="text-slate-600">{formatAcademicYear(reg.academicYear)}</span>
                           </td>
 
                           {/* Registered Date */}

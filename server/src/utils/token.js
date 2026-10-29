@@ -25,7 +25,8 @@ const signToken = (user) => {
     id: user._id ? user._id.toString() : user.id,
     role: user.role,
     email: user.email,
-    name: user.name
+    name: user.name,
+    authVersion: Number(user.authVersion) || 0
   };
 
   return jwt.sign(payload, getJwtSecret(), {

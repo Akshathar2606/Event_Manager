@@ -9,7 +9,8 @@ const {
 } = require('../controllers/eventController');
 const {
   registerForEvent,
-  getEventAttendees
+  getEventAttendees,
+  getWhatsAppGroupLink
 } = require('../controllers/registrationController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
@@ -18,6 +19,7 @@ const router = express.Router();
 
 // Read operations: Accessible to authenticated users (role-based scoping handled in controller)
 router.get('/', verifyToken, getEvents);
+router.get('/:id/whatsapp-group', verifyToken, authorizeRoles('participant'), getWhatsAppGroupLink);
 router.get('/:id', verifyToken, getEventById);
 
 // Participant event registration endpoint

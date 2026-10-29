@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { EVENT_CATEGORIES, EVENT_STATUS } = require('../models/Event');
+const { EVENT_CATEGORIES, EVENT_STATUS, STUDENT_YEARS } = require('../models/Event');
+const { EMAIL_REGEX } = require('./validation');
 
 /**
  * Checks if a string is a valid MongoDB ObjectId.
@@ -21,6 +22,13 @@ const validateEventInput = (input, isUpdate = false, existingEvent = null) => {
     title,
     description,
     category,
+    aictePointsAvailable,
+    attendanceProvided,
+    eligibleYears,
+    contacts,
+    websiteUrl,
+    instagramUrl,
+    whatsappGroupUrl,
     venue,
     startDateTime,
     endDateTime,
@@ -31,6 +39,172 @@ const validateEventInput = (input, isUpdate = false, existingEvent = null) => {
     budget,
     tags
   } = input || {};
+
+  const validateBooleanField = (fieldValue, fieldName) => {
+    if (fieldValue !== undefined && typeof fieldValue !== 'boolean') {
+      errors.push(`${fieldName} must be a boolean.`);
+    }
+  };
+  validateBooleanField(aictePointsAvailable, 'AICTE points availability');
+  validateBooleanField(attendanceProvided, 'Attendance availability');
+
+  let sanitizedEligibleYears;
+  if (eligibleYears !== undefined) {
+    if (!Array.isArray(eligibleYears)) {
+      errors.push('Eligible student years must be an array.');
+    } else {
+      const invalidYears = eligibleYears.filter(
+        (year) => typeof year !== 'string' || !STUDENT_YEARS.includes(year)
+      );
+      if (invalidYears.length > 0) {
+        errors.push(`Eligible student years must be selected from: ${STUDENT_YEARS.join(', ')}.`);
+      }
+      sanitizedEligibleYears = Array.from(new Set(eligibleYears.filter(
+        (year) => typeof year === 'string' && STUDENT_YEARS.includes(year)
+      )));
+      if (sanitizedEligibleYears.length === 0) {
+        errors.push('Select at least one eligible student year.');
+      }
+    }
+  }
+
+  let sanitizedContacts;
+  if (contacts !== undefined) {
+    if (!Array.isArray(contacts)) {
+      errors.push('Event contacts must be an array.');
+    } else if (contacts.length > 20) {
+      errors.push('An event cannot have more than 20 contacts.');
+    } else {
+      const allowedContactFields = new Set(['name', 'role', 'email', 'phone']);
+      sanitizedContacts = contacts.map((contact, index) => {
+        const prefix = `Contact ${index + 1}`;
+        if (
+          !contact ||
+          typeof contact !== 'object' ||
+          Array.isArray(contact) ||
+          Object.getPrototypeOf(contact) !== Object.prototype
+        ) {
+          errors.push(`${prefix} must be an object.`);
+          return null;
+        }
+
+        if (Object.keys(contact).some((field) => !allowedContactFields.has(field))) {
+          errors.push(`${prefix} contains unsupported fields.`);
+        }
+
+        const name = typeof contact.name === 'string' ? contact.name.trim() : '';
+        const role = contact.role === undefined ? '' : contact.role;
+        const email = typeof contact.email === 'string' ? contact.email.trim() : '';
+        const phone = contact.phone === undefined ? '' : contact.phone;
+
+        if (!name) {
+          errors.push(`${prefix} name is required.`);
+        } else if (name.length > 120) {
+          errors.push(`${prefix} name cannot exceed 120 characters.`);
+        }
+        if (typeof role !== 'string') {
+          errors.push(`${prefix} role must be a string.`);
+        } else if (role.trim().length > 100) {
+          errors.push(`${prefix} role cannot exceed 100 characters.`);
+        }
+        if (!email || !EMAIL_REGEX.test(email)) {
+          errors.push(`${prefix} must have a valid email address.`);
+        }
+        if (typeof phone !== 'string') {
+          errors.push(`${prefix} phone must be a string.`);
+        } else if (phone.trim()) {
+          const trimmedPhone = phone.trim();
+          const digitCount = (trimmedPhone.match(/\d/g) || []).length;
+          if (!/^\+?[\d\s().-]+$/.test(trimmedPhone) || digitCount < 7 || digitCount > 15) {
+            errors.push(`${prefix} phone must be a valid phone number.`);
+          }
+        }
+
+        return {
+          name,
+          role: typeof role === 'string' ? role.trim() : '',
+          email: email.toLowerCase(),
+          phone: typeof phone === 'string' ? phone.trim() : ''
+        };
+      });
+    }
+  }
+
+  const normalizeEventUrl = (value, fieldName, instagramOnly = false) => {
+    if (value === undefined) return undefined;
+    if (typeof value !== 'string') {
+      errors.push(`${fieldName} must be a URL string.`);
+      return '';
+    }
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (trimmed.length > 2048) {
+      errors.push(`${fieldName} cannot exceed 2048 characters.`);
+      return '';
+    }
+
+    try {
+      const parsed = new URL(trimmed);
+      if (
+        !['http:', 'https:'].includes(parsed.protocol) ||
+        !parsed.hostname ||
+        parsed.username ||
+        parsed.password
+      ) {
+        errors.push(`${fieldName} must be an absolute HTTP or HTTPS URL.`);
+        return '';
+      }
+      if (
+        instagramOnly &&
+        parsed.hostname !== 'instagram.com' &&
+        !parsed.hostname.endsWith('.instagram.com')
+      ) {
+        errors.push('Instagram URL must use an Instagram domain.');
+        return '';
+      }
+      return parsed.toString();
+    } catch {
+      errors.push(`${fieldName} must be a valid absolute HTTP or HTTPS URL.`);
+      return '';
+    }
+  };
+  const sanitizedWebsiteUrl = normalizeEventUrl(websiteUrl, 'Website URL');
+  const sanitizedInstagramUrl = normalizeEventUrl(instagramUrl, 'Instagram URL', true);
+  let sanitizedWhatsAppGroupUrl;
+  if (whatsappGroupUrl !== undefined) {
+    if (typeof whatsappGroupUrl !== 'string') {
+      errors.push('WhatsApp group invite URL must be a URL string.');
+      sanitizedWhatsAppGroupUrl = '';
+    } else {
+      const trimmed = whatsappGroupUrl.trim();
+      if (!trimmed) {
+        sanitizedWhatsAppGroupUrl = '';
+      } else if (trimmed.length > 2048) {
+        errors.push('WhatsApp group invite URL cannot exceed 2048 characters.');
+        sanitizedWhatsAppGroupUrl = '';
+      } else {
+        try {
+          const parsed = new URL(trimmed);
+          if (
+            parsed.protocol !== 'https:' ||
+            parsed.hostname !== 'chat.whatsapp.com' ||
+            parsed.port ||
+            !parsed.pathname || parsed.pathname === '/' ||
+            parsed.username ||
+            parsed.password
+          ) {
+            errors.push('WhatsApp group invite URL must be a valid HTTPS chat.whatsapp.com invitation.');
+            sanitizedWhatsAppGroupUrl = '';
+          } else {
+            sanitizedWhatsAppGroupUrl = parsed.toString();
+          }
+        } catch {
+          errors.push('WhatsApp group invite URL must be a valid HTTPS chat.whatsapp.com invitation.');
+          sanitizedWhatsAppGroupUrl = '';
+        }
+      }
+    }
+  }
 
   // Effective state resolution (merges update changes with existing document attributes)
   const effectiveTitle = title !== undefined ? title : existingEvent?.title;
@@ -208,6 +382,27 @@ const validateEventInput = (input, isUpdate = false, existingEvent = null) => {
   if (title !== undefined) sanitized.title = title.trim();
   if (description !== undefined) sanitized.description = description.trim();
   if (category !== undefined) sanitized.category = category.trim().toLowerCase();
+  if (aictePointsAvailable !== undefined) sanitized.aictePointsAvailable = aictePointsAvailable;
+  else if (!isUpdate || existingEvent?.aictePointsAvailable === undefined) {
+    sanitized.aictePointsAvailable = false;
+  }
+  if (attendanceProvided !== undefined) sanitized.attendanceProvided = attendanceProvided;
+  else if (!isUpdate || existingEvent?.attendanceProvided === undefined) {
+    sanitized.attendanceProvided = false;
+  }
+  if (sanitizedEligibleYears !== undefined) {
+    sanitized.eligibleYears = sanitizedEligibleYears;
+  } else if (!isUpdate || existingEvent?.eligibleYears === undefined) {
+    sanitized.eligibleYears = [...STUDENT_YEARS];
+  }
+  if (sanitizedContacts !== undefined) sanitized.contacts = sanitizedContacts;
+  else if (!isUpdate || existingEvent?.contacts === undefined) sanitized.contacts = [];
+  if (sanitizedWebsiteUrl !== undefined) sanitized.websiteUrl = sanitizedWebsiteUrl;
+  else if (!isUpdate || existingEvent?.websiteUrl === undefined) sanitized.websiteUrl = '';
+  if (sanitizedInstagramUrl !== undefined) sanitized.instagramUrl = sanitizedInstagramUrl;
+  else if (!isUpdate || existingEvent?.instagramUrl === undefined) sanitized.instagramUrl = '';
+  if (sanitizedWhatsAppGroupUrl !== undefined) sanitized.whatsappGroupUrl = sanitizedWhatsAppGroupUrl;
+  else if (!isUpdate || existingEvent?.whatsappGroupUrl === undefined) sanitized.whatsappGroupUrl = '';
   if (capacity !== undefined) sanitized.capacity = Number(capacity);
   if ((!isUpdate || startDateTime !== undefined) && parsedStart && !isNaN(parsedStart.getTime())) {
     sanitized.startDateTime = parsedStart;
@@ -241,5 +436,6 @@ module.exports = {
   isValidObjectId,
   validateEventInput,
   EVENT_CATEGORIES,
-  EVENT_STATUS
+  EVENT_STATUS,
+  STUDENT_YEARS
 };

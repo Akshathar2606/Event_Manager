@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { STUDENT_YEARS } = require('./Event');
 
 const REGISTRATION_STATUS = ['registered', 'cancelled'];
 
@@ -13,6 +14,13 @@ const registrationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: [true, 'Participant reference is required']
+    },
+    academicYear: {
+      type: String,
+      enum: {
+        values: STUDENT_YEARS,
+        message: '{VALUE} is not a valid academic year. Allowed years: ' + STUDENT_YEARS.join(', ')
+      }
     },
     status: {
       type: String,

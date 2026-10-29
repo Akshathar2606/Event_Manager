@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authService, extractErrorMessage } from '../services/authService';
 import { getStoredToken, onUnauthorized } from '../services/api';
-import { getRoleHomePath } from '../utils/roles';
+import { getRoleHomePath, hasAllowedRole, normalizeRole } from '../utils/roles';
 
 const AuthContext = createContext(null);
 
@@ -100,13 +100,15 @@ export const AuthProvider = ({ children }) => {
     authError,
     isAuthenticated: Boolean(user && token),
     role: user?.role || null,
-    isAdmin: user?.role === 'administrator',
-    isOrganizer: user?.role === 'organizer',
-    isParticipant: user?.role === 'participant',
-    isVendor: user?.role === 'vendor',
+    isAdmin: normalizeRole(user?.role) === 'administrator',
+    isOrganizer: normalizeRole(user?.role) === 'organizer',
+    isParticipant: normalizeRole(user?.role) === 'participant',
+    isVendor: normalizeRole(user?.role) === 'vendor',
     hasRole: (roles) => {
       if (!user || !user.role) return false;
-      return Array.isArray(roles) ? roles.includes(user.role) : user.role === roles;
+      return Array.isArray(roles)
+        ? hasAllowedRole(user.role, roles)
+        : normalizeRole(user.role) === normalizeRole(roles);
     },
     login,
     register,

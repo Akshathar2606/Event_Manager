@@ -3,6 +3,15 @@
  */
 
 export const REGISTRATION_STATUS = ['registered', 'cancelled'];
+export const ACADEMIC_YEAR_OPTIONS = [
+  { value: 'first', label: 'First Year' },
+  { value: 'second', label: 'Second Year' },
+  { value: 'third', label: 'Third Year' },
+  { value: 'fourth', label: 'Fourth Year' }
+];
+
+export const formatAcademicYear = (academicYear) =>
+  ACADEMIC_YEAR_OPTIONS.find((year) => year.value === academicYear)?.label || 'Not provided';
 
 /**
  * Checks if an event has already started based on its start date-time.

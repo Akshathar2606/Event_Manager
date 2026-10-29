@@ -88,8 +88,53 @@ const validateLoginInput = ({ email, password }) => {
   };
 };
 
+const validateForgotPasswordInput = ({ email } = {}) => {
+  if (typeof email !== 'string' || !email.trim()) {
+    return { isValid: false, errors: ['Email is required.'], sanitized: { email: '' } };
+  }
+  if (!EMAIL_REGEX.test(email.trim())) {
+    return {
+      isValid: false,
+      errors: ['Please enter a valid email address.'],
+      sanitized: { email: '' }
+    };
+  }
+  return {
+    isValid: true,
+    errors: [],
+    sanitized: { email: email.trim().toLowerCase() }
+  };
+};
+
+const validateResetPasswordInput = ({ token, newPassword } = {}) => {
+  const errors = [];
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/i.test(token)) {
+    errors.push('A valid password reset token is required.');
+  }
+  if (typeof newPassword !== 'string' || !newPassword) {
+    errors.push('New password is required.');
+  } else {
+    if (newPassword.length < 8) {
+      errors.push('Password must be at least 8 characters long.');
+    }
+    if (!/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      errors.push('Password must contain at least one letter and one number.');
+    }
+  }
+  return {
+    isValid: errors.length === 0,
+    errors,
+    sanitized: {
+      token: typeof token === 'string' ? token : '',
+      newPassword: typeof newPassword === 'string' ? newPassword : ''
+    }
+  };
+};
+
 module.exports = {
   EMAIL_REGEX,
   validateRegistrationInput,
-  validateLoginInput
+  validateLoginInput,
+  validateForgotPasswordInput,
+  validateResetPasswordInput
 };

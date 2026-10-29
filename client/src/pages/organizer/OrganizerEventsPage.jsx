@@ -7,6 +7,18 @@ import {
 } from '../../services/eventService';
 import { venueService } from '../../services/venueService';
 import {
+  DEFAULT_ELIGIBLE_YEARS,
+  STUDENT_YEAR_OPTIONS,
+  getEventFeatureDetails
+} from '../../utils/eventFeatures';
+import {
+  getEventContacts,
+  isValidEventEmail,
+  isValidEventPhone,
+  isValidEventUrl,
+  getSafeWhatsAppGroupUrl
+} from '../../utils/eventContacts';
+import {
   Calendar,
   Plus,
   Search,
@@ -27,7 +39,10 @@ import {
   Sparkles,
   X,
   Building2,
-  Info
+  Info,
+  Globe,
+  Instagram,
+  Trash2
 } from 'lucide-react';
 
 const toDatetimeLocal = (isoString) => {
@@ -36,6 +51,19 @@ const toDatetimeLocal = (isoString) => {
   if (isNaN(date.getTime())) return '';
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+};
+
+const getDateTimePart = (value, part) => {
+  const [date = '', time = ''] = (value || '').split('T');
+  return part === 'date' ? date : time;
+};
+
+const updateDateTimePart = (value, part, nextPart) => {
+  let date = getDateTimePart(value, 'date');
+  let time = getDateTimePart(value, 'time');
+  if (part === 'date') date = nextPart;
+  else time = nextPart;
+  return date || time ? `${date}T${time}` : '';
 };
 
 const formatDate = (isoString) => {
@@ -103,6 +131,13 @@ export default function OrganizerEventsPage() {
     title: '',
     description: '',
     category: 'academic',
+    aictePointsAvailable: false,
+    attendanceProvided: false,
+    eligibleYears: [...DEFAULT_ELIGIBLE_YEARS],
+    contacts: [],
+    websiteUrl: '',
+    instagramUrl: '',
+    whatsappGroupUrl: '',
     venue: '',
     startDateTime: '',
     endDateTime: '',
@@ -190,6 +225,15 @@ export default function OrganizerEventsPage() {
       title: event.title || '',
       description: event.description || '',
       category: event.category || 'academic',
+      aictePointsAvailable: event.aictePointsAvailable === true,
+      attendanceProvided: event.attendanceProvided === true,
+      eligibleYears: Array.isArray(event.eligibleYears)
+        ? event.eligibleYears
+        : [...DEFAULT_ELIGIBLE_YEARS],
+      contacts: getEventContacts(event),
+      websiteUrl: typeof event.websiteUrl === 'string' ? event.websiteUrl : '',
+      instagramUrl: typeof event.instagramUrl === 'string' ? event.instagramUrl : '',
+      whatsappGroupUrl: typeof event.whatsappGroupUrl === 'string' ? event.whatsappGroupUrl : '',
       venue: venueId,
       startDateTime: toDatetimeLocal(event.startDateTime),
       endDateTime: toDatetimeLocal(event.endDateTime),
@@ -212,10 +256,16 @@ export default function OrganizerEventsPage() {
     if (!formData.description || formData.description.trim().length === 0) {
       errs.push('Event description is required.');
     }
-    if (!formData.startDateTime) {
+    if (
+      !getDateTimePart(formData.startDateTime, 'date') ||
+      !getDateTimePart(formData.startDateTime, 'time')
+    ) {
       errs.push('Event start date and time is required.');
     }
-    if (!formData.endDateTime) {
+    if (
+      !getDateTimePart(formData.endDateTime, 'date') ||
+      !getDateTimePart(formData.endDateTime, 'time')
+    ) {
       errs.push('Event end date and time is required.');
     }
 
@@ -243,6 +293,27 @@ export default function OrganizerEventsPage() {
     if (formData.budget && Number(formData.budget) < 0) {
       errs.push('Budget cannot be negative.');
     }
+    if (!formData.eligibleYears.length) {
+      errs.push('Select at least one eligible student year.');
+    }
+    formData.contacts.forEach((contact, index) => {
+      const label = `Contact ${index + 1}`;
+      if (!contact.name.trim()) errs.push(`${label} name is required.`);
+      if (!isValidEventEmail(contact.email)) errs.push(`${label} must have a valid email address.`);
+      if (contact.role.length > 100) errs.push(`${label} role cannot exceed 100 characters.`);
+      if (contact.phone && !isValidEventPhone(contact.phone)) {
+        errs.push(`${label} phone must be a valid phone number.`);
+      }
+    });
+    if (!isValidEventUrl(formData.websiteUrl)) {
+      errs.push('Website URL must be an absolute HTTP or HTTPS URL.');
+    }
+    if (!isValidEventUrl(formData.instagramUrl, true)) {
+      errs.push('Instagram URL must be an absolute HTTP or HTTPS URL on an Instagram domain.');
+    }
+    if (formData.whatsappGroupUrl.trim() && !getSafeWhatsAppGroupUrl(formData.whatsappGroupUrl)) {
+      errs.push('WhatsApp group invite URL must be a valid HTTPS chat.whatsapp.com invitation.');
+    }
 
     return errs;
   };
@@ -263,6 +334,20 @@ export default function OrganizerEventsPage() {
       title: formData.title.trim(),
       description: formData.description.trim(),
       category: formData.category,
+      aictePointsAvailable: formData.aictePointsAvailable,
+      attendanceProvided: formData.attendanceProvided,
+      eligibleYears: formData.eligibleYears,
+      contacts: formData.contacts.map((contact) => ({
+        name: contact.name.trim(),
+        role: contact.role.trim(),
+        email: contact.email.trim().toLowerCase(),
+        phone: contact.phone.trim()
+      })),
+      websiteUrl: formData.websiteUrl.trim(),
+      instagramUrl: formData.instagramUrl.trim(),
+      whatsappGroupUrl: formData.whatsappGroupUrl.trim()
+        ? getSafeWhatsAppGroupUrl(formData.whatsappGroupUrl)
+        : '',
       venue: formData.venue || null,
       startDateTime: new Date(formData.startDateTime).toISOString(),
       endDateTime: new Date(formData.endDateTime).toISOString(),
@@ -498,6 +583,7 @@ export default function OrganizerEventsPage() {
           {events.map((event) => {
             const badge = getStatusBadge(event.status);
             const StatusIcon = badge.icon;
+            const eventFeatures = getEventFeatureDetails(event);
             const venueName = typeof event.venue === 'object' && event.venue
               ? event.venue.name
               : 'Venue Unassigned';
@@ -557,6 +643,17 @@ export default function OrganizerEventsPage() {
                         <div className="flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-slate-400" />
                           <span>Attendees: <strong className="text-slate-800">{event.registeredCount || 0}</strong> / {event.capacity}</span>
+                        </div>
+                        <div className="pt-2 border-t border-slate-100 space-y-1 text-[11px]">
+                          <p>
+                            AICTE points: <strong className="text-slate-800">{eventFeatures.aictePointsAvailable ? 'Yes' : 'No'}</strong>
+                          </p>
+                          <p>
+                            Attendance provided: <strong className="text-slate-800">{eventFeatures.attendanceProvided ? 'Yes' : 'No'}</strong>
+                          </p>
+                          <p>
+                            Eligible years: <strong className="text-slate-800">{eventFeatures.eligibleYearsLabel}</strong>
+                          </p>
                         </div>
                         {event.budget > 0 && (
                           <div className="flex items-center gap-1">
@@ -644,7 +741,7 @@ export default function OrganizerEventsPage() {
       {/* CREATE / EDIT EVENT MODAL */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl max-h-[calc(100vh-2rem)] my-4 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
@@ -679,65 +776,164 @@ export default function OrganizerEventsPage() {
             )}
 
             {/* Form */}
-            <form onSubmit={handleSubmitForm} className="p-6 space-y-4 text-xs">
-              {/* Title */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Event Title <span className="text-rose-500">*</span>
+            <form onSubmit={handleSubmitForm} className="min-h-0 flex-1 overflow-y-auto p-6 space-y-5 text-xs">
+              <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 space-y-4">
+                <h3 className="text-sm font-bold text-slate-900">1. Basic Event Information</h3>
+                <label className="block font-semibold text-slate-700">
+                  Event Name <span className="text-rose-500">*</span>
+                  <input
+                    type="text"
+                    required
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="e.g. Annual Campus Robotics Hackathon 2026"
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="e.g. Annual Campus Robotics Hackathon 2026"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Description <span className="text-rose-500">*</span>
+                <label className="block font-semibold text-slate-700">
+                  Event Description <span className="text-rose-500">*</span>
+                  <textarea
+                    rows={4}
+                    required
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Summarize the agenda, target attendees, and learning objectives..."
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-y"
+                  />
                 </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Summarize the agenda, target attendees, and learning objectives..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
-                />
-              </div>
-
-              {/* Category & Venue Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="block font-semibold text-slate-700">
                     Event Category <span className="text-rose-500">*</span>
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 capitalize focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    >
+                      {EVENT_CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                        </option>
+                      ))}
+                    </select>
                   </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 capitalize focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  >
-                    {EVENT_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="block font-semibold text-slate-700">
+                    Event Tags (comma-separated)
+                    <input
+                      type="text"
+                      value={formData.tags}
+                      onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                      placeholder="e.g. coding, competition, ai"
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </label>
                 </div>
+                <label className="block font-semibold text-slate-700">
+                  Event Banner Image URL (Optional)
+                  <input
+                    type="url"
+                    value={formData.bannerUrl}
+                    onChange={(e) => setFormData({ ...formData, bannerUrl: e.target.value })}
+                    placeholder="https://example.com/banner.jpg"
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  The signed-in organizer account is assigned automatically.
+                </p>
+              </section>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>Assigned Campus Venue</span>
-                    {venuesLoading && <Loader2 className="w-3 h-3 text-indigo-500 animate-spin" />}
+              <section className="rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-4">
+                <h3 className="text-sm font-bold text-slate-900">2. Event Schedule</h3>
+                {[
+                  { label: 'Start', field: 'startDateTime' },
+                  { label: 'End', field: 'endDateTime' }
+                ].map(({ label, field }) => (
+                  <div key={field} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className="block font-semibold text-slate-700">
+                      {label} Date <span className="text-rose-500">*</span>
+                      <input
+                        type="date"
+                        required
+                        value={getDateTimePart(formData[field], 'date')}
+                        onChange={(event) =>
+                          setFormData((previous) => ({
+                            ...previous,
+                            [field]: updateDateTimePart(previous[field], 'date', event.target.value)
+                          }))
+                        }
+                        className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      />
+                    </label>
+                    <label className="block font-semibold text-slate-700">
+                      {label} Time <span className="text-rose-500">*</span>
+                      <input
+                        type="time"
+                        required
+                        value={getDateTimePart(formData[field], 'time')}
+                        onChange={(event) =>
+                          setFormData((previous) => ({
+                            ...previous,
+                            [field]: updateDateTimePart(previous[field], 'time', event.target.value)
+                          }))
+                        }
+                        className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      />
+                    </label>
+                  </div>
+                ))}
+                <p className="text-[11px] text-slate-500">
+                  The event end must be later than its start. Times use your local timezone.
+                </p>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 space-y-4">
+                <h3 className="text-sm font-bold text-slate-900">3. Event Capacity &amp; Registration</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="block font-semibold text-slate-700">
+                    Maximum Attendees <span className="text-rose-500">*</span>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={formData.capacity}
+                      onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
                   </label>
+                  <label className="block font-semibold text-slate-700">
+                    Registration Deadline (Optional)
+                    <input
+                      type="datetime-local"
+                      value={formData.registrationDeadline}
+                      onChange={(e) => setFormData({ ...formData, registrationDeadline: e.target.value })}
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </label>
+                  <label className="block font-semibold text-slate-700 md:col-span-2">
+                    Event Budget ($ USD, Optional)
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.budget}
+                      onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                      placeholder="e.g. 1500"
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-4">
+                <h3 className="text-sm font-bold text-slate-900">4. Venue &amp; Location</h3>
+                <label className="block font-semibold text-slate-700">
+                  <span className="flex items-center justify-between gap-2">
+                    <span>Assigned Campus Venue</span>
+                    {venuesLoading && <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" aria-label="Loading venues" />}
+                  </span>
                   <select
                     value={formData.venue}
                     onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   >
                     <option value="">-- No Venue Selected (Draft Pending) --</option>
                     {venues.map((v) => (
@@ -746,133 +942,306 @@ export default function OrganizerEventsPage() {
                       </option>
                     ))}
                   </select>
-                  {venues.length === 0 && !venuesLoading && (
-                    <p className="text-[10px] text-amber-600 mt-1">
-                      No active venues available. You can draft now and assign later.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Date & Time Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Start Date & Time <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={formData.startDateTime}
-                    onChange={(e) => setFormData({ ...formData, startDateTime: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    End Date & Time <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={formData.endDateTime}
-                    onChange={(e) => setFormData({ ...formData, endDateTime: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Registration Deadline & Capacity Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Registration Deadline (Optional)
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.registrationDeadline}
-                    onChange={(e) => setFormData({ ...formData, registrationDeadline: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Attendee Capacity <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Budget & Tags Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Budget ($ USD, Optional)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.budget}
-                    onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
-                    placeholder="e.g. 1500"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Tags (Comma-separated)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.tags}
-                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                    placeholder="e.g. coding, competition, ai"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Banner Image URL */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Banner Image URL (Optional)
                 </label>
-                <input
-                  type="url"
-                  value={formData.bannerUrl}
-                  onChange={(e) => setFormData({ ...formData, bannerUrl: e.target.value })}
-                  placeholder="https://example.com/banner.jpg"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
+                {venues.length === 0 && !venuesLoading && (
+                  <p className="text-[11px] text-amber-600">
+                    No active venues available. You can draft now and assign later.
+                  </p>
+                )}
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 space-y-4">
+                <h3 className="text-sm font-bold text-slate-900">5. Event Benefits</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { name: 'aictePointsAvailable', label: 'AICTE Points Provided' },
+                    { name: 'attendanceProvided', label: 'Attendance Provided' }
+                  ].map((field) => (
+                    <fieldset key={field.name} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+                      <legend className="px-1 font-semibold text-slate-700">{field.label}</legend>
+                      <div className="flex items-center gap-6">
+                        {[['yes', true], ['no', false]].map(([label, value]) => (
+                          <label key={label} className="inline-flex items-center gap-2 text-slate-600">
+                            <input
+                              type="radio"
+                              name={field.name}
+                              value={label}
+                              checked={formData[field.name] === value}
+                              onChange={() =>
+                                setFormData((previous) => ({ ...previous, [field.name]: value }))
+                              }
+                              className="text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="capitalize">{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
+                <h3 className="text-sm font-bold text-slate-900">6. Eligible Student Years</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <label className="inline-flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-slate-700 font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={DEFAULT_ELIGIBLE_YEARS.every((year) =>
+                        formData.eligibleYears.includes(year)
+                      )}
+                      onChange={(event) =>
+                        setFormData((previous) => ({
+                          ...previous,
+                          eligibleYears: event.target.checked ? [...DEFAULT_ELIGIBLE_YEARS] : []
+                        }))
+                      }
+                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    All Years
+                  </label>
+                  {STUDENT_YEAR_OPTIONS.map(({ value, label }) => (
+                    <label key={value} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={formData.eligibleYears.includes(value)}
+                        onChange={(event) =>
+                          setFormData((previous) => ({
+                            ...previous,
+                            eligibleYears: event.target.checked
+                              ? [...previous.eligibleYears, value]
+                              : previous.eligibleYears.filter((year) => year !== value)
+                          }))
+                        }
+                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  “All Years” reflects when all four individual years are selected.
+                </p>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">7. Contact &amp; Support</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Add event-specific contacts for participant questions.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData((previous) => ({
+                        ...previous,
+                        contacts: [...previous.contacts, { name: '', role: '', email: '', phone: '' }]
+                      }))
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                  >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Add Contact
+                  </button>
+                </div>
+
+                {formData.contacts.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center">
+                    <p className="text-sm font-medium text-slate-600">No contacts added</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Participant contact details are optional. Add one or more contacts when needed.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {formData.contacts.map((contact, index) => (
+                      <fieldset
+                        key={index}
+                        className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4 space-y-3"
+                      >
+                        <legend className="px-1 text-xs font-semibold text-slate-700">
+                          Contact {index + 1}
+                        </legend>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <label className="block text-xs font-medium text-slate-700">
+                            Name <span className="text-rose-500">*</span>
+                            <input
+                              type="text"
+                              required
+                              maxLength={120}
+                              value={contact.name}
+                              onChange={(event) =>
+                                setFormData((previous) => ({
+                                  ...previous,
+                                  contacts: previous.contacts.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, name: event.target.value } : item
+                                  )
+                                }))
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            />
+                          </label>
+                          <label className="block text-xs font-medium text-slate-700">
+                            Role / Designation (Optional)
+                            <input
+                              type="text"
+                              maxLength={100}
+                              value={contact.role}
+                              onChange={(event) =>
+                                setFormData((previous) => ({
+                                  ...previous,
+                                  contacts: previous.contacts.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, role: event.target.value } : item
+                                  )
+                                }))
+                              }
+                              placeholder="Event Coordinator"
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            />
+                          </label>
+                          <label className="block text-xs font-medium text-slate-700">
+                            Email <span className="text-rose-500">*</span>
+                            <input
+                              type="email"
+                              required
+                              value={contact.email}
+                              onChange={(event) =>
+                                setFormData((previous) => ({
+                                  ...previous,
+                                  contacts: previous.contacts.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, email: event.target.value } : item
+                                  )
+                                }))
+                              }
+                              placeholder="contact@example.edu"
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            />
+                          </label>
+                          <label className="block text-xs font-medium text-slate-700">
+                            Phone (Optional)
+                            <input
+                              type="tel"
+                              value={contact.phone}
+                              onChange={(event) =>
+                                setFormData((previous) => ({
+                                  ...previous,
+                                  contacts: previous.contacts.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, phone: event.target.value } : item
+                                  )
+                                }))
+                              }
+                              placeholder="+1 (555) 123-4567"
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            />
+                          </label>
+                        </div>
+                        <div className="flex justify-end border-t border-slate-100 pt-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData((previous) => ({
+                                ...previous,
+                                contacts: previous.contacts.filter((_, itemIndex) => itemIndex !== index)
+                              }))
+                            }
+                            aria-label={`Remove contact ${index + 1}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            Remove
+                          </button>
+                        </div>
+                      </fieldset>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">8. Official Links</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Optional links for the event or organizing club.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="block text-xs font-medium text-slate-700">
+                    Website URL
+                    <span className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 px-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500">
+                      <Globe className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                      <input
+                        type="url"
+                        value={formData.websiteUrl}
+                        onChange={(event) =>
+                          setFormData((previous) => ({ ...previous, websiteUrl: event.target.value }))
+                        }
+                        placeholder="https://example.edu/event"
+                        className="min-w-0 w-full py-2 text-slate-800 outline-none"
+                      />
+                    </span>
+                  </label>
+                  <label className="block text-xs font-medium text-slate-700">
+                    Instagram URL
+                    <span className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 px-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500">
+                      <Instagram className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                      <input
+                        type="url"
+                        value={formData.instagramUrl}
+                        onChange={(event) =>
+                          setFormData((previous) => ({ ...previous, instagramUrl: event.target.value }))
+                        }
+                        placeholder="https://www.instagram.com/eventclub"
+                        className="min-w-0 w-full py-2 text-slate-800 outline-none"
+                      />
+                    </span>
+                  </label>
+                  <label className="block text-xs font-medium text-slate-700 sm:col-span-2">
+                    WhatsApp Group Invite URL
+                    <span className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 px-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500">
+                      <span className="text-emerald-600 font-bold" aria-hidden="true">WA</span>
+                      <input
+                        type="url"
+                        value={formData.whatsappGroupUrl}
+                        onChange={(event) =>
+                          setFormData((previous) => ({
+                            ...previous,
+                            whatsappGroupUrl: event.target.value
+                          }))
+                        }
+                        placeholder="https://chat.whatsapp.com/..."
+                        aria-label="WhatsApp Group Invite URL"
+                        className="min-w-0 w-full py-2 text-slate-800 outline-none"
+                      />
+                    </span>
+                    <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                      Optional. Only participants with an active event registration can access this link.
+                    </span>
+                  </label>
+                </div>
+              </section>
 
               {/* Modal Action Buttons */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={modalSubmitting}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs disabled:opacity-50 transition-colors"
-                >
-                  {modalSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{editingEvent ? 'Save Changes' : 'Save as Draft'}</span>
-                </button>
+              <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <h3 className="text-sm font-bold text-slate-900">9. Final Actions</h3>
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={modalSubmitting}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs disabled:opacity-50 transition-colors"
+                  >
+                    {modalSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>{editingEvent ? 'Save Changes' : 'Save as Draft'}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

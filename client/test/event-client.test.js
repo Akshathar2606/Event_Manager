@@ -2,6 +2,15 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { eventService, EVENT_CATEGORIES, EVENT_STATUS } from '../src/services/eventService.js';
 import api from '../src/services/api.js';
+import { getEventFeatureDetails } from '../src/utils/eventFeatures.js';
+import {
+  getEventContacts,
+  getOfficialEventLinks,
+  getRegisteredWhatsAppGroupUrl,
+  getSafeWhatsAppGroupUrl,
+  isValidEventPhone,
+  isValidEventUrl
+} from '../src/utils/eventContacts.js';
 
 describe('Frontend Event Service & Parameter Serialization Tests', () => {
   let interceptedRequest = null;
@@ -153,5 +162,103 @@ describe('Frontend Event Service & Parameter Serialization Tests', () => {
     assert.equal(interceptedRequest.method, 'DELETE');
     assert.equal(interceptedRequest.url, `/events/${eventId}`);
     assert.equal(res.success, true);
+  });
+
+  test('event feature display data renders independent benefits and selected years', () => {
+    assert.deepEqual(
+      getEventFeatureDetails({
+        aictePointsAvailable: true,
+        attendanceProvided: false,
+        eligibleYears: ['first', 'third']
+      }),
+      {
+        aictePointsAvailable: true,
+        attendanceProvided: false,
+        eligibleYears: ['first', 'third'],
+        eligibleYearsLabel: 'First Year, Third Year'
+      }
+    );
+  });
+
+  test('event feature display applies safe defaults for legacy event responses', () => {
+    const details = getEventFeatureDetails({});
+    assert.equal(details.aictePointsAvailable, false);
+    assert.equal(details.attendanceProvided, false);
+    assert.deepEqual(details.eligibleYears, ['first', 'second', 'third', 'fourth']);
+    assert.equal(
+      details.eligibleYearsLabel,
+      'First Year, Second Year, Third Year, Fourth Year'
+    );
+  });
+
+  test('participant event detail data includes explicit contacts and safe official links', () => {
+    const event = {
+      contacts: [
+        {
+          name: 'Jordan Lee',
+          role: 'Event Coordinator',
+          email: 'jordan@example.edu',
+          phone: '+1 (555) 123-4567'
+        },
+        { name: 'Morgan Ray', email: 'morgan@example.edu', phone: '' }
+      ],
+      websiteUrl: 'https://events.example.edu/placement',
+      instagramUrl: 'https://www.instagram.com/placement/'
+    };
+
+    assert.deepEqual(getEventContacts(event), [
+      {
+        name: 'Jordan Lee',
+        role: 'Event Coordinator',
+        email: 'jordan@example.edu',
+        phone: '+1 (555) 123-4567'
+      },
+      { name: 'Morgan Ray', role: '', email: 'morgan@example.edu', phone: '' }
+    ]);
+    assert.deepEqual(getOfficialEventLinks(event), [
+      { type: 'website', label: 'Website', href: 'https://events.example.edu/placement' },
+      { type: 'instagram', label: 'Instagram', href: 'https://www.instagram.com/placement/' }
+    ]);
+  });
+
+  test('participant event details hide absent legacy contact and links and reject unsafe links', () => {
+    assert.deepEqual(getEventContacts({}), []);
+    assert.deepEqual(getOfficialEventLinks({}), []);
+    assert.deepEqual(
+      getOfficialEventLinks({
+        websiteUrl: 'javascript:alert(1)',
+        instagramUrl: 'https://not-instagram.example/profile'
+      }),
+      []
+    );
+    assert.equal(isValidEventPhone(''), true);
+    assert.equal(isValidEventPhone('555-123-4567'), true);
+    assert.equal(isValidEventPhone('123'), false);
+    assert.equal(isValidEventUrl('https://instagram.com/club', true), true);
+    assert.equal(isValidEventUrl('https://instagram.com.evil.example/club', true), false);
+  });
+
+  test('WhatsApp group links require a valid HTTPS WhatsApp invite and active registration', () => {
+    const response = {
+      data: { whatsappGroupUrl: 'https://chat.whatsapp.com/InviteCode' }
+    };
+    assert.equal(
+      getRegisteredWhatsAppGroupUrl({ status: 'registered' }, response),
+      'https://chat.whatsapp.com/InviteCode'
+    );
+    assert.equal(getRegisteredWhatsAppGroupUrl({ status: 'cancelled' }, response), '');
+    assert.equal(
+      getSafeWhatsAppGroupUrl({ toString: () => 'https://chat.whatsapp.com/InviteCode' }),
+      ''
+    );
+    for (const unsafeUrl of [
+      'http://chat.whatsapp.com/InviteCode',
+      'javascript:alert(1)',
+      'https://chat.whatsapp.com.evil.example/InviteCode',
+      'https://chat.whatsapp.com:8443/InviteCode',
+      'https://chat.whatsapp.com/'
+    ]) {
+      assert.equal(getSafeWhatsAppGroupUrl(unsafeUrl), '');
+    }
   });
 });

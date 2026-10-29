@@ -42,6 +42,16 @@ const getUserStore = (req) => {
     : null;
 };
 
+const getReferenceId = (reference) => {
+  if (reference === null || reference === undefined) return '';
+  if (typeof reference === 'string') return reference;
+  if (typeof reference.toHexString === 'function') return reference.toHexString();
+  if (typeof reference === 'object') {
+    return getReferenceId(reference._id !== undefined ? reference._id : reference.id);
+  }
+  return String(reference);
+};
+
 /**
  * Helper to populate event, venue, organizer, and reviewedBy in mock objects for test consistency
  */
@@ -52,7 +62,7 @@ const populateMockBooking = (booking, req) => {
 
   const populated = { ...booking };
 
-  const eventId = typeof populated.event === 'object' && populated.event ? (populated.event.id || populated.event._id) : populated.event;
+  const eventId = getReferenceId(populated.event);
   if (typeof eventId === 'string' && eventStore) {
     const event = eventStore.get(eventId);
     if (event) {
@@ -68,7 +78,7 @@ const populateMockBooking = (booking, req) => {
     }
   }
 
-  const venueId = typeof populated.venue === 'object' && populated.venue ? (populated.venue.id || populated.venue._id) : populated.venue;
+  const venueId = getReferenceId(populated.venue);
   if (typeof venueId === 'string' && venueStore) {
     const venue = venueStore.get(venueId);
     if (venue) {
@@ -84,7 +94,7 @@ const populateMockBooking = (booking, req) => {
     }
   }
 
-  const organizerId = typeof populated.organizer === 'object' && populated.organizer ? (populated.organizer.id || populated.organizer._id) : populated.organizer;
+  const organizerId = getReferenceId(populated.organizer);
   if (typeof organizerId === 'string' && userStore) {
     const organizer = userStore.get(organizerId);
     if (organizer) {
@@ -99,7 +109,7 @@ const populateMockBooking = (booking, req) => {
   }
 
   if (populated.reviewedBy) {
-    const reviewerId = typeof populated.reviewedBy === 'object' ? (populated.reviewedBy.id || populated.reviewedBy._id) : populated.reviewedBy;
+    const reviewerId = getReferenceId(populated.reviewedBy);
     if (typeof reviewerId === 'string' && userStore) {
       const reviewer = userStore.get(reviewerId);
       if (reviewer) {
@@ -160,11 +170,9 @@ const createBooking = async (req, res, next) => {
       });
     }
 
-    const eventOrgId = typeof event.organizer === 'object' && event.organizer
-      ? (event.organizer.id || event.organizer._id)
-      : event.organizer;
+    const eventOrgId = getReferenceId(event.organizer);
 
-    if (req.user.role !== 'administrator' && String(eventOrgId) !== organizerId) {
+    if (req.user.role !== 'administrator' && eventOrgId !== organizerId) {
       return res.status(403).json({
         success: false,
         message: 'Forbidden. You can only request venue bookings for events you organize.'
@@ -224,11 +232,9 @@ const createBooking = async (req, res, next) => {
     }
 
     // Check consistency with event's assigned venue if already set
-    const assignedVenueId = typeof event.venue === 'object' && event.venue
-      ? (event.venue.id || event.venue._id)
-      : event.venue;
+    const assignedVenueId = getReferenceId(event.venue);
 
-    if (assignedVenueId && String(assignedVenueId) !== String(sanitized.venue)) {
+    if (assignedVenueId && assignedVenueId !== String(sanitized.venue)) {
       return res.status(400).json({
         success: false,
         message: 'Requested venue does not match the venue currently assigned to the event.'
@@ -344,17 +350,11 @@ const getBookings = async (req, res, next) => {
       // Access control filtering
       if (!isAdmin) {
         list = list.filter((b) => {
-          const orgId = typeof b.organizer === 'object' && b.organizer
-            ? (b.organizer.id || b.organizer._id)
-            : b.organizer;
-          return String(orgId) === req.user.id;
+          return getReferenceId(b.organizer) === req.user.id;
         });
       } else if (organizer && isValidObjectId(organizer)) {
         list = list.filter((b) => {
-          const orgId = typeof b.organizer === 'object' && b.organizer
-            ? (b.organizer.id || b.organizer._id)
-            : b.organizer;
-          return String(orgId) === String(organizer);
+          return getReferenceId(b.organizer) === String(organizer);
         });
       }
 
@@ -366,16 +366,14 @@ const getBookings = async (req, res, next) => {
       // Venue filter
       if (venue && isValidObjectId(venue)) {
         list = list.filter((b) => {
-          const vId = typeof b.venue === 'object' && b.venue ? (b.venue.id || b.venue._id) : b.venue;
-          return String(vId) === String(venue);
+          return getReferenceId(b.venue) === String(venue);
         });
       }
 
       // Event filter
       if (event && isValidObjectId(event)) {
         list = list.filter((b) => {
-          const eId = typeof b.event === 'object' && b.event ? (b.event.id || b.event._id) : b.event;
-          return String(eId) === String(event);
+          return getReferenceId(b.event) === String(event);
         });
       }
 
@@ -523,11 +521,9 @@ const getBookingById = async (req, res, next) => {
       });
     }
 
-    const orgId = typeof booking.organizer === 'object' && booking.organizer
-      ? (booking.organizer.id || booking.organizer._id)
-      : booking.organizer;
+    const orgId = getReferenceId(booking.organizer);
 
-    if (!isAdmin && String(orgId) !== req.user.id) {
+    if (!isAdmin && orgId !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Forbidden. You do not have permission to view this booking.'
@@ -588,7 +584,7 @@ const approveBooking = async (req, res, next) => {
     }
 
     // 1. Data consistency: Validate associated Event
-    const eventId = typeof booking.event === 'object' && booking.event ? (booking.event.id || booking.event._id) : booking.event;
+    const eventId = getReferenceId(booking.event);
     let event = null;
     if (eventStore) {
       event = eventStore.get(eventId);
@@ -611,7 +607,7 @@ const approveBooking = async (req, res, next) => {
     }
 
     // 2. Data consistency: Validate associated Venue
-    const venueId = typeof booking.venue === 'object' && booking.venue ? (booking.venue.id || booking.venue._id) : booking.venue;
+    const venueId = getReferenceId(booking.venue);
     let venue = null;
     if (venueStore) {
       venue = venueStore.get(venueId);
@@ -651,12 +647,12 @@ const approveBooking = async (req, res, next) => {
     // existing.startDateTime < requested.endDateTime AND existing.endDateTime > requested.startDateTime
     if (mockStore) {
       for (const other of mockStore.values()) {
-        const otherId = other.id || other._id;
-        const otherVenueId = typeof other.venue === 'object' && other.venue ? (other.venue.id || other.venue._id) : other.venue;
+        const otherId = getReferenceId(other);
+        const otherVenueId = getReferenceId(other.venue);
 
         if (
           String(otherId) !== String(id) &&
-          String(otherVenueId) === String(venueId) &&
+          otherVenueId === venueId &&
           other.status === 'approved' &&
           !other.isArchived
         ) {
@@ -666,7 +662,7 @@ const approveBooking = async (req, res, next) => {
               message: 'Double-booking conflict: The venue is already approved for another event during this time interval.',
               conflict: {
                 bookingId: otherId,
-                eventId: other.event,
+                eventId: getReferenceId(other.event),
                 startDateTime: other.startDateTime,
                 endDateTime: other.endDateTime
               }
@@ -948,11 +944,9 @@ const cancelBooking = async (req, res, next) => {
       });
     }
 
-    const orgId = typeof booking.organizer === 'object' && booking.organizer
-      ? (booking.organizer.id || booking.organizer._id)
-      : booking.organizer;
+    const orgId = getReferenceId(booking.organizer);
 
-    if (!isAdmin && String(orgId) !== req.user.id) {
+    if (!isAdmin && orgId !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Forbidden. You cannot cancel another organizer\'s booking.'
@@ -983,23 +977,19 @@ const cancelBooking = async (req, res, next) => {
       // revert the event's status to 'draft' so it is not publicly exposed without a valid approved venue
       if (wasApproved) {
         const eventStore = getEventStore(req);
-        const eventId = typeof booking.event === 'object' && booking.event
-          ? (booking.event.id || booking.event._id)
-          : booking.event;
+        const eventId = getReferenceId(booking.event);
 
         if (eventStore && eventId) {
           const event = eventStore.get(eventId);
           if (event && event.status === 'published') {
-            const assignedVenue = typeof event.venue === 'object' && event.venue
-              ? (event.venue.id || event.venue._id)
-              : event.venue;
+            const assignedVenue = getReferenceId(event.venue);
 
             // Check if another approved booking still covers the event duration
             let otherApproved = false;
             for (const b of mockStore.values()) {
-              const bId = b.id || b._id;
-              const bEventId = typeof b.event === 'object' && b.event ? (b.event.id || b.event._id) : b.event;
-              const bVenueId = typeof b.venue === 'object' && b.venue ? (b.venue.id || b.venue._id) : b.venue;
+              const bId = getReferenceId(b);
+              const bEventId = getReferenceId(b.event);
+              const bVenueId = getReferenceId(b.venue);
               if (
                 String(bId) !== String(id) &&
                 String(bEventId) === String(eventId) &&
@@ -1055,9 +1045,7 @@ const cancelBooking = async (req, res, next) => {
       // If an approved booking for a published event is cancelled,
       // revert the event's status to 'draft' atomically within the transaction
       if (wasApproved) {
-        const eventId = typeof booking.event === 'object' && booking.event
-          ? (booking.event.id || booking.event._id)
-          : booking.event;
+        const eventId = getReferenceId(booking.event);
 
         if (eventId) {
           const event = await Event.findById(eventId).session(session || null);

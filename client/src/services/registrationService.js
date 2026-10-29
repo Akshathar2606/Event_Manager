@@ -10,8 +10,8 @@ export const registrationService = {
    * @param {string} eventId - Event ObjectId
    * @returns {Promise<{ success: boolean, message: string, data: Object }>}
    */
-  async registerForEvent(eventId) {
-    const response = await api.post(`/events/${eventId}/register`);
+  async registerForEvent(eventId, academicYear) {
+    const response = await api.post(`/events/${eventId}/register`, { academicYear });
     return response.data;
   },
 
@@ -75,6 +75,16 @@ export const registrationService = {
     });
 
     const response = await api.get(`/events/${eventId}/attendees`, { params: queryParams });
+    return response.data;
+  },
+
+  /**
+   * Retrieve the event WhatsApp invite link for an active registration.
+   * @param {string} eventId - Event ObjectId
+   * @returns {Promise<{ success: boolean, data: { whatsappGroupUrl: string } }>}
+   */
+  async getWhatsAppGroupLink(eventId) {
+    const response = await api.get(`/events/${eventId}/whatsapp-group`);
     return response.data;
   }
 };

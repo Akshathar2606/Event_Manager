@@ -29,6 +29,19 @@ const userSchema = new mongoose.Schema(
       required: [true, 'Password hash is required'],
       select: false // Never return passwordHash in default queries
     },
+    passwordResetTokenHash: {
+      type: String,
+      select: false
+    },
+    passwordResetExpires: {
+      type: Date,
+      select: false
+    },
+    authVersion: {
+      type: Number,
+      default: 0,
+      select: false
+    },
     role: {
       type: String,
       required: [true, 'Role is required'],
@@ -61,6 +74,9 @@ const userSchema = new mongoose.Schema(
         delete ret._id;
         delete ret.__v;
         delete ret.passwordHash;
+        delete ret.passwordResetTokenHash;
+        delete ret.passwordResetExpires;
+        delete ret.authVersion;
         return ret;
       }
     },
@@ -70,11 +86,16 @@ const userSchema = new mongoose.Schema(
         delete ret._id;
         delete ret.__v;
         delete ret.passwordHash;
+        delete ret.passwordResetTokenHash;
+        delete ret.passwordResetExpires;
+        delete ret.authVersion;
         return ret;
       }
     }
   }
 );
+
+userSchema.index({ passwordResetTokenHash: 1 }, { sparse: true });
 
 // Method to verify password candidate against stored passwordHash
 userSchema.methods.comparePassword = async function (candidatePassword) {

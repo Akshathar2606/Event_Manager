@@ -1,13 +1,16 @@
 const express = require('express');
-const { register, login, getMe } = require('../controllers/authController');
+const { register, login, forgotPassword, resetPassword, getMe } = require('../controllers/authController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
+const { passwordRecoveryRateLimit } = require('../middleware/passwordRecoveryRateLimit');
 
 const router = express.Router();
 
 // Public routes
 router.post('/register', register);
 router.post('/login', login);
+router.post('/forgot-password', passwordRecoveryRateLimit, forgotPassword);
+router.post('/reset-password', passwordRecoveryRateLimit, resetPassword);
 
 // Authenticated current-user profile
 router.get('/me', verifyToken, getMe);

@@ -5,6 +5,8 @@ const app = require('../src/app');
 const { request } = require('./testHelper');
 const { signToken } = require('../src/utils/token');
 const { buildEventQuery, getStore } = require('../src/controllers/eventController');
+const { Event } = require('../src/models/Event');
+const { validateEventInput } = require('../src/utils/eventValidation');
 
 describe('EventFlow Event Management Test Suite', () => {
   let adminUser, adminToken;
@@ -13,6 +15,117 @@ describe('EventFlow Event Management Test Suite', () => {
   let participantUser, participantToken;
   let vendorUser, vendorToken;
   let testVenue;
+
+  test('Event schema applies backward-compatible feature defaults', () => {
+    const event = new Event({
+      title: 'Default Features Event',
+      description: 'An event using schema defaults.',
+      category: 'academic',
+      organizer: new mongoose.Types.ObjectId(),
+      startDateTime: new Date('2026-11-15T09:00:00.000Z'),
+      endDateTime: new Date('2026-11-15T10:00:00.000Z'),
+      capacity: 100
+    });
+
+    assert.equal(event.aictePointsAvailable, false);
+    assert.equal(event.attendanceProvided, false);
+    assert.deepEqual(event.eligibleYears, ['first', 'second', 'third', 'fourth']);
+    assert.deepEqual(event.contacts, []);
+    assert.equal(event.websiteUrl, '');
+    assert.equal(event.instagramUrl, '');
+    assert.equal(event.whatsappGroupUrl, '');
+  });
+
+  test('Event validation requires booleans and known, non-empty eligible year arrays', () => {
+    const baseEvent = {
+      title: 'Validated Event',
+      description: 'Event fields are validated.',
+      category: 'academic',
+      startDateTime: '2026-11-15T09:00:00.000Z',
+      endDateTime: '2026-11-15T10:00:00.000Z',
+      capacity: 100
+    };
+
+    for (const invalidPayload of [
+      { aictePointsAvailable: 'yes' },
+      { attendanceProvided: 1 },
+      { eligibleYears: 'first,second' },
+      { eligibleYears: ['fifth'] },
+      { eligibleYears: [] }
+    ]) {
+      const validation = validateEventInput({ ...baseEvent, ...invalidPayload });
+      assert.equal(validation.isValid, false, JSON.stringify(invalidPayload));
+    }
+
+    const valid = validateEventInput({
+      ...baseEvent,
+      aictePointsAvailable: true,
+      attendanceProvided: false,
+      eligibleYears: ['first', 'second', 'first']
+    });
+    assert.equal(valid.isValid, true);
+    assert.deepEqual(valid.sanitized.eligibleYears, ['first', 'second']);
+  });
+
+  test('Event contact and link validation normalizes safe values and rejects malformed input', () => {
+    const baseEvent = {
+      title: 'Contact Validation Event',
+      description: 'Validate contact and event link data.',
+      category: 'academic',
+      startDateTime: '2026-11-15T09:00:00.000Z',
+      endDateTime: '2026-11-15T10:00:00.000Z',
+      capacity: 100
+    };
+    const valid = validateEventInput({
+      ...baseEvent,
+      contacts: [
+        {
+          name: '  Alex Example ',
+          role: ' Event Coordinator ',
+          email: '  ALEX@EXAMPLE.EDU ',
+          phone: '+1 (555) 123-4567'
+        },
+        { name: 'Sam Example', email: 'sam@example.edu', phone: '' }
+      ],
+      websiteUrl: ' https://events.example.edu/placement ',
+      instagramUrl: 'https://www.instagram.com/eventflow/'
+    });
+
+    assert.equal(valid.isValid, true, valid.errors.join(', '));
+    assert.deepEqual(valid.sanitized.contacts, [
+      {
+        name: 'Alex Example',
+        role: 'Event Coordinator',
+        email: 'alex@example.edu',
+        phone: '+1 (555) 123-4567'
+      },
+      { name: 'Sam Example', role: '', email: 'sam@example.edu', phone: '' }
+    ]);
+    assert.equal(valid.sanitized.websiteUrl, 'https://events.example.edu/placement');
+    assert.equal(valid.sanitized.instagramUrl, 'https://www.instagram.com/eventflow/');
+
+    const invalidPayloads = [
+      { contacts: [{ name: '', email: 'contact@example.edu' }] },
+      { contacts: [{ name: 'Valid Name', email: 'not-an-email' }] },
+      { contacts: [{ name: 'Valid Name', email: 'contact@example.edu', phone: '12' }] },
+      { contacts: [{ name: 'Valid Name', email: 'contact@example.edu', admin: true }] },
+      { contacts: { name: 'Valid Name', email: 'contact@example.edu' } },
+      { websiteUrl: 'javascript:alert(1)' },
+      { websiteUrl: 'data:text/html,unsafe' },
+      { websiteUrl: 'ftp://example.edu/resource' },
+      { instagramUrl: 'https://example.com/not-instagram' }
+    ];
+    for (const invalidFields of invalidPayloads) {
+      const result = validateEventInput({ ...baseEvent, ...invalidFields });
+      assert.equal(result.isValid, false, JSON.stringify(invalidFields));
+    }
+
+    const emptyOptionalFields = validateEventInput(baseEvent);
+    assert.equal(emptyOptionalFields.isValid, true);
+    assert.deepEqual(emptyOptionalFields.sanitized.contacts, []);
+    assert.equal(emptyOptionalFields.sanitized.websiteUrl, '');
+    assert.equal(emptyOptionalFields.sanitized.instagramUrl, '');
+  });
 
   beforeEach(() => {
     // Reset test in-memory stores before each test
@@ -161,6 +274,119 @@ describe('EventFlow Event Management Test Suite', () => {
       // Organizer must be authoritatively bound to organizer1User
       const orgId = typeof res.body.data.organizer === 'object' ? res.body.data.organizer.id : res.body.data.organizer;
       assert.equal(orgId, organizer1User.id);
+    });
+
+    test('Organizer event creation persists independent benefit flags and eligible years', async () => {
+      const res = await request(app, {
+        method: 'POST',
+        url: '/api/events',
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          ...validEventPayload,
+          aictePointsAvailable: true,
+          attendanceProvided: false,
+          eligibleYears: ['first', 'third']
+        }
+      });
+
+      assert.equal(res.status, 201);
+      assert.equal(res.body.data.aictePointsAvailable, true);
+      assert.equal(res.body.data.attendanceProvided, false);
+      assert.deepEqual(res.body.data.eligibleYears, ['first', 'third']);
+    });
+
+    test('Event creation applies backward-compatible defaults when feature fields are omitted', async () => {
+      const res = await request(app, {
+        method: 'POST',
+        url: '/api/events',
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: validEventPayload
+      });
+
+      assert.equal(res.status, 201);
+      assert.equal(res.body.data.aictePointsAvailable, false);
+      assert.equal(res.body.data.attendanceProvided, false);
+      assert.deepEqual(res.body.data.eligibleYears, ['first', 'second', 'third', 'fourth']);
+    });
+
+    test('Organizer can create an event with multiple contacts and official links', async () => {
+      const res = await request(app, {
+        method: 'POST',
+        url: '/api/events',
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          ...validEventPayload,
+          contacts: [
+            { name: 'Jordan Lee', role: 'Event Coordinator', email: 'JORDAN@EXAMPLE.EDU', phone: '+1 555 123 4567' },
+            { name: 'Morgan Ray', email: 'morgan@example.edu' }
+          ],
+          websiteUrl: 'https://events.example.edu/placement-iq',
+          instagramUrl: 'https://instagram.com/placementiq'
+        }
+      });
+
+      assert.equal(res.status, 201);
+      assert.deepEqual(res.body.data.contacts, [
+        { name: 'Jordan Lee', role: 'Event Coordinator', email: 'jordan@example.edu', phone: '+1 555 123 4567' },
+        { name: 'Morgan Ray', role: '', email: 'morgan@example.edu', phone: '' }
+      ]);
+      assert.equal(res.body.data.websiteUrl, 'https://events.example.edu/placement-iq');
+      assert.equal(res.body.data.instagramUrl, 'https://instagram.com/placementiq');
+    });
+
+    test('Organizer can create event with a valid WhatsApp group invite URL', async () => {
+      const res = await request(app, {
+        method: 'POST',
+        url: '/api/events',
+        headers: { authorization: 'Bearer ' + organizer1Token },
+        body: {
+          ...validEventPayload,
+          whatsappGroupUrl: 'https://chat.whatsapp.com/InviteCode'
+        }
+      });
+
+      assert.equal(res.status, 201);
+      assert.equal(res.body.data.whatsappGroupUrl, 'https://chat.whatsapp.com/InviteCode');
+    });
+
+    test('Event creation rejects unsafe, malformed, and unrelated WhatsApp URLs', async () => {
+      for (const whatsappGroupUrl of [
+        'http://chat.whatsapp.com/InviteCode',
+        'javascript:alert(1)',
+        'https://example.com/group',
+        'https://chat.whatsapp.com.evil.example/InviteCode',
+        'https://chat.whatsapp.com:8443/InviteCode',
+        'https://chat.whatsapp.com/'
+      ]) {
+        const res = await request(app, {
+          method: 'POST',
+          url: '/api/events',
+          headers: { authorization: 'Bearer ' + organizer1Token },
+          body: { ...validEventPayload, whatsappGroupUrl }
+        });
+
+        assert.equal(res.status, 400, `Expected rejection for ${whatsappGroupUrl}`);
+        assert.ok(res.body.errors.some((error) => /WhatsApp group invite URL/i.test(error)));
+      }
+    });
+
+    test('Event creation rejects invalid feature values and arbitrary student years', async () => {
+      const res = await request(app, {
+        method: 'POST',
+        url: '/api/events',
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          ...validEventPayload,
+          aictePointsAvailable: 'Yes',
+          attendanceProvided: true,
+          eligibleYears: ['first', 'graduate']
+        }
+      });
+
+      assert.equal(res.status, 400);
+      assert.equal(res.body.success, false);
+      assert.ok(res.body.errors.some((error) => /must be a boolean/i.test(error)));
+      assert.ok(res.body.errors.some((error) => /selected from/i.test(error)));
     });
 
     test('4. Input validation rejects invalid dates (endDateTime <= startDateTime)', async () => {
@@ -401,6 +627,7 @@ describe('EventFlow Event Management Test Suite', () => {
     });
 
     test('13. Participants can view published event details', async () => {
+      publishedEvent.whatsappGroupUrl = 'https://chat.whatsapp.com/SecretInvite';
       const res = await request(app, {
         method: 'GET',
         url: `/api/events/${publishedEvent.id}`,
@@ -411,6 +638,19 @@ describe('EventFlow Event Management Test Suite', () => {
       assert.equal(res.body.success, true);
       assert.equal(res.body.data.id, publishedEvent.id);
       assert.equal(res.body.data.title, 'Open Campus Tech Talk');
+      assert.equal(res.body.data.whatsappGroupUrl, undefined);
+    });
+
+    test('Public event listings do not expose WhatsApp invitation URLs', async () => {
+      publishedEvent.whatsappGroupUrl = 'https://chat.whatsapp.com/SecretInvite';
+      const res = await request(app, {
+        method: 'GET',
+        url: '/api/events',
+        headers: { authorization: 'Bearer ' + participantToken }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.data[0].whatsappGroupUrl, undefined);
     });
 
     test('14. Participants are forbidden from viewing unpublished draft events (403)', async () => {
@@ -512,7 +752,104 @@ describe('EventFlow Event Management Test Suite', () => {
       assert.equal(res.body.data.capacity, 120);
     });
 
-    test('18. Status update: Owner organizer can publish and cancel event', async () => {
+    test('Owner organizer can update feature values; another organizer cannot', async () => {
+      event1.organizer = new mongoose.Types.ObjectId(organizer1User.id);
+      const ownerUpdate = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${event1.id}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          aictePointsAvailable: false,
+          attendanceProvided: true,
+          eligibleYears: ['second', 'fourth']
+        }
+      });
+
+      assert.equal(ownerUpdate.status, 200);
+      assert.equal(ownerUpdate.body.data.aictePointsAvailable, false);
+      assert.equal(ownerUpdate.body.data.attendanceProvided, true);
+      assert.deepEqual(ownerUpdate.body.data.eligibleYears, ['second', 'fourth']);
+
+      const unauthorizedUpdate = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${event1.id}`,
+        headers: { authorization: `Bearer ${organizer2Token}` },
+        body: { eligibleYears: ['first'] }
+      });
+
+      assert.equal(unauthorizedUpdate.status, 403);
+      assert.equal(unauthorizedUpdate.body.success, false);
+    });
+
+    test('Owner organizer can edit contacts and remove them by submitting an empty array', async () => {
+      const addContacts = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${event1.id}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          contacts: [
+            { name: 'Taylor Chen', role: 'Technical Coordinator', email: 'TAYLOR@EXAMPLE.EDU', phone: '(555) 321-7654' },
+            { name: 'Jamie Park', email: 'jamie@example.edu' }
+          ],
+          websiteUrl: 'https://placement.example.edu',
+          instagramUrl: 'https://www.instagram.com/placement/'
+        }
+      });
+      assert.equal(addContacts.status, 200);
+      assert.deepEqual(addContacts.body.data.contacts.map((contact) => contact.email), [
+        'taylor@example.edu',
+        'jamie@example.edu'
+      ]);
+      assert.equal(addContacts.body.data.websiteUrl, 'https://placement.example.edu/');
+      assert.equal(addContacts.body.data.instagramUrl, 'https://www.instagram.com/placement/');
+
+      const removeContacts = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${event1.id}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: { contacts: [], websiteUrl: '', instagramUrl: '' }
+      });
+      assert.equal(removeContacts.status, 200);
+      assert.deepEqual(removeContacts.body.data.contacts, []);
+      assert.equal(removeContacts.body.data.websiteUrl, '');
+      assert.equal(removeContacts.body.data.instagramUrl, '');
+    });
+
+    test('Owner organizer can update or clear the WhatsApp group invite URL', async () => {
+      const setLink = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${event1.id}`,
+        headers: { authorization: 'Bearer ' + organizer1Token },
+        body: { whatsappGroupUrl: 'https://chat.whatsapp.com/InviteCode' }
+      });
+      assert.equal(setLink.status, 200);
+      assert.equal(setLink.body.data.whatsappGroupUrl, 'https://chat.whatsapp.com/InviteCode');
+
+      const clearLink = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${event1.id}`,
+        headers: { authorization: 'Bearer ' + organizer1Token },
+        body: { whatsappGroupUrl: '' }
+      });
+      assert.equal(clearLink.status, 200);
+      assert.equal(clearLink.body.data.whatsappGroupUrl, '');
+
+      const unauthorizedUpdate = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${event1.id}`,
+        headers: { authorization: 'Bearer ' + organizer2Token },
+        body: { whatsappGroupUrl: 'https://chat.whatsapp.com/OtherInvite' }
+      });
+      assert.equal(unauthorizedUpdate.status, 403);
+      assert.equal(app.locals.mockEventStore.get(event1.id).whatsappGroupUrl, '');
+    });
+
+    test('Owner organizer can publish and cancel an event with an unpopulated BSON ObjectId owner', async () => {
+      event1.organizer = new mongoose.Types.ObjectId(organizer1User.id);
+      event1.aictePointsAvailable = true;
+      event1.attendanceProvided = false;
+      event1.eligibleYears = ['first', 'third'];
+
       // 1. Publish
       const publishRes = await request(app, {
         method: 'PATCH',
@@ -522,6 +859,9 @@ describe('EventFlow Event Management Test Suite', () => {
       });
       assert.equal(publishRes.status, 200);
       assert.equal(publishRes.body.data.status, 'published');
+      assert.equal(publishRes.body.data.aictePointsAvailable, true);
+      assert.equal(publishRes.body.data.attendanceProvided, false);
+      assert.deepEqual(publishRes.body.data.eligibleYears, ['first', 'third']);
 
       // 2. Cancel
       const cancelRes = await request(app, {
@@ -532,6 +872,63 @@ describe('EventFlow Event Management Test Suite', () => {
       });
       assert.equal(cancelRes.status, 200);
       assert.equal(cancelRes.body.data.status, 'cancelled');
+    });
+
+    test('Another organizer cannot publish or cancel an event with a BSON ObjectId owner', async () => {
+      event1.organizer = new mongoose.Types.ObjectId(organizer1User.id);
+
+      for (const status of ['published', 'cancelled']) {
+        const res = await request(app, {
+          method: 'PATCH',
+          url: `/api/events/${event1.id}/status`,
+          headers: { authorization: `Bearer ${organizer2Token}` },
+          body: { status }
+        });
+
+        assert.equal(res.status, 403);
+        assert.equal(res.body.success, false);
+        assert.match(res.body.message, /not authorized to update this event/i);
+      }
+
+      assert.equal(event1.status, 'draft');
+    });
+
+    test('Event update and status endpoints reject invalid and unknown event IDs', async () => {
+      const invalidUpdate = await request(app, {
+        method: 'PUT',
+        url: '/api/events/not-an-object-id',
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: { title: 'Updated Title' }
+      });
+      assert.equal(invalidUpdate.status, 400);
+      assert.match(invalidUpdate.body.message, /invalid event id/i);
+
+      const missingUpdate = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${new mongoose.Types.ObjectId()}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: { title: 'Updated Title' }
+      });
+      assert.equal(missingUpdate.status, 404);
+      assert.match(missingUpdate.body.message, /event not found/i);
+
+      const invalidStatus = await request(app, {
+        method: 'PATCH',
+        url: '/api/events/not-an-object-id/status',
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: { status: 'published' }
+      });
+      assert.equal(invalidStatus.status, 400);
+      assert.match(invalidStatus.body.message, /invalid event id/i);
+
+      const missingStatus = await request(app, {
+        method: 'PATCH',
+        url: `/api/events/${new mongoose.Types.ObjectId()}/status`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: { status: 'published' }
+      });
+      assert.equal(missingStatus.status, 404);
+      assert.match(missingStatus.body.message, /event not found/i);
     });
 
     test('19. Safe archival: DELETE sets isArchived to true', async () => {

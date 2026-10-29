@@ -60,7 +60,7 @@ const verifyToken = async (req, res, next) => {
     let user = null;
     if (mongoose.connection.readyState === 1) {
       try {
-        user = await User.findById(decoded.id);
+        user = await User.findById(decoded.id).select('+authVersion');
       } catch (dbErr) {
         console.warn('[Auth Middleware Warning] Database lookup failed:', dbErr.message);
       }
@@ -71,6 +71,13 @@ const verifyToken = async (req, res, next) => {
         return res.status(403).json({
           success: false,
           message: 'Account has been deactivated. Access denied.'
+        });
+      }
+
+      if ((decoded.authVersion || 0) !== (user.authVersion || 0)) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authorization token has been revoked. Please log in again.'
         });
       }
 
@@ -93,6 +100,12 @@ const verifyToken = async (req, res, next) => {
           return res.status(403).json({
             success: false,
             message: 'Account has been deactivated. Access denied.'
+          });
+        }
+        if ((decoded.authVersion || 0) !== (mockUser.authVersion || 0)) {
+          return res.status(401).json({
+            success: false,
+            message: 'Authorization token has been revoked. Please log in again.'
           });
         }
         req.user = {

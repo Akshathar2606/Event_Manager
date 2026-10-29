@@ -5,10 +5,12 @@ import {
   isEventStarted,
   isRegistrationCancellable,
   getRegistrationStatusBadge,
+  formatAcademicYear,
   formatDisplayDate,
   formatDisplayTime
 } from '../../utils/registrationUtils';
 import { extractErrorMessage } from '../../services/authService';
+import { getRegisteredWhatsAppGroupUrl } from '../../utils/eventContacts';
 import {
   Ticket,
   Calendar,
@@ -27,7 +29,8 @@ import {
   User,
   Mail,
   AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  MessageCircle
 } from 'lucide-react';
 
 export default function ParticipantRegistrationsPage() {
@@ -35,6 +38,8 @@ export default function ParticipantRegistrationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState(null);
+  const [whatsAppGroupLinks, setWhatsAppGroupLinks] = useState({});
+  const [whatsAppLinkErrors, setWhatsAppLinkErrors] = useState({});
 
   // Tab & Pagination
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'registered', 'cancelled'
@@ -82,6 +87,51 @@ export default function ParticipantRegistrationsPage() {
   useEffect(() => {
     fetchRegistrations(1);
   }, [fetchRegistrations]);
+
+  useEffect(() => {
+    let active = true;
+    const activeEventIds = Array.from(new Set(
+      registrations
+        .filter((registration) => registration.status === 'registered')
+        .map((registration) => registration.event?.id || registration.event?._id)
+        .filter((eventId) => typeof eventId === 'string' && eventId)
+    ));
+
+    setWhatsAppGroupLinks({});
+    setWhatsAppLinkErrors({});
+    if (activeEventIds.length === 0) return () => { active = false; };
+
+    Promise.all(activeEventIds.map(async (eventId) => {
+      try {
+        const response = await registrationService.getWhatsAppGroupLink(eventId);
+        const safeUrl = getRegisteredWhatsAppGroupUrl(
+          registrations.find((registration) =>
+            (registration.event?.id || registration.event?._id) === eventId
+          ),
+          response
+        );
+        return [eventId, safeUrl, ''];
+      } catch (requestError) {
+        const status = requestError?.response?.status;
+        if (status === 403 || status === 404) return [eventId, '', ''];
+        return [
+          eventId,
+          '',
+          'Unable to load the WhatsApp group link. Refresh to try again.'
+        ];
+      }
+    })).then((results) => {
+      if (!active) return;
+      setWhatsAppGroupLinks(Object.fromEntries(
+        results.filter(([, url]) => url).map(([eventId, url]) => [eventId, url])
+      ));
+      setWhatsAppLinkErrors(Object.fromEntries(
+        results.filter(([, , message]) => message).map(([eventId, , message]) => [eventId, message])
+      ));
+    });
+
+    return () => { active = false; };
+  }, [registrations]);
 
   // Handle Tab Switch
   const handleTabChange = (tab) => {
@@ -239,6 +289,10 @@ export default function ParticipantRegistrationsPage() {
           {registrations.map((reg) => {
             const regId = reg._id || reg.id;
             const event = reg.event || {};
+            const eventId = event.id || event._id;
+            const whatsAppGroupUrl = reg.status === 'registered'
+              ? whatsAppGroupLinks[eventId]
+              : '';
             const venue = event.venue || {};
             const badge = getRegistrationStatusBadge(reg.status);
             const StatusIcon = badge.icon === CheckCircle2 ? CheckCircle2 : XCircle;
@@ -250,108 +304,143 @@ export default function ParticipantRegistrationsPage() {
             return (
               <div
                 key={regId}
-                className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 hover:border-indigo-300 transition-colors"
+                className="w-full min-w-0 space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition-colors hover:border-indigo-300 sm:p-5"
               >
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  {/* Left: Info */}
-                  <div className="space-y-2 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {event.category && (
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700">
-                          {event.category}
-                        </span>
-                      )}
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  {event.category && (
+                    <span className="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                      {event.category}
+                    </span>
+                  )}
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${badge.classes}`}
+                  >
+                    <StatusIcon className="h-3 w-3 shrink-0" />
+                    <span>{badge.label}</span>
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    Ref: <code className="font-mono text-slate-600">{String(regId).slice(-6).toUpperCase()}</code>
+                  </span>
+                </div>
 
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badge.classes}`}
-                      >
-                        <StatusIcon className="w-3 h-3" />
-                        <span>{badge.label}</span>
-                      </span>
+                <h3 className="min-w-0 break-words text-lg font-extrabold leading-snug text-slate-900 sm:text-xl">
+                  {event.title || 'Untitled Event'}
+                </h3>
 
-                      <span className="text-[11px] text-slate-400">
-                        Ref: <code className="font-mono text-slate-600">{String(regId).slice(-6).toUpperCase()}</code>
-                      </span>
+                <div className="grid min-w-0 grid-cols-1 gap-4 text-xs text-slate-600 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
+                    <div className="min-w-0">
+                      <div className="break-words font-medium text-slate-800">
+                        {formatDisplayDate(event.startDateTime)}
+                      </div>
+                      <div className="break-words text-[11px] text-slate-400">
+                        {formatDisplayTime(event.startDateTime)} – {formatDisplayTime(event.endDateTime)}
+                      </div>
                     </div>
+                  </div>
 
-                    <h3 className="text-base font-extrabold text-slate-900 leading-snug">
-                      {event.title || 'Untitled Event'}
-                    </h3>
+                  <div className="flex min-w-0 items-start gap-2">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                    <div className="min-w-0">
+                      <div className="break-words font-medium text-slate-800">
+                        {venue.name || 'Campus Venue'}
+                      </div>
+                      <div className="break-words text-[11px] text-slate-400">
+                        {venue.location || 'Location TBA'}
+                      </div>
+                    </div>
+                  </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-xs text-slate-600 pt-1">
-                      {/* Date & Time */}
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
-                        <div>
-                          <div className="font-medium text-slate-800">{formatDisplayDate(event.startDateTime)}</div>
-                          <div className="text-[11px] text-slate-400">
-                            {formatDisplayTime(event.startDateTime)} – {formatDisplayTime(event.endDateTime)}
+                  <div className="flex min-w-0 items-start gap-2">
+                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                    <div className="min-w-0 break-words">
+                      {isCancelled ? (
+                        <>
+                          <div className="font-medium text-rose-700">
+                            Cancelled on {formatDisplayDate(reg.cancelledAt)}
                           </div>
-                        </div>
-                      </div>
-
-                      {/* Venue */}
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                        <div className="truncate">
-                          <div className="font-medium text-slate-800 truncate">{venue.name || 'Campus Venue'}</div>
-                          <div className="text-[11px] text-slate-400 truncate">{venue.location || 'Location TBA'}</div>
-                        </div>
-                      </div>
-
-                      {/* Registration Date / Cancellation Detail */}
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                        <div>
-                          {isCancelled ? (
-                            <>
-                              <div className="text-rose-700 font-medium">Cancelled on {formatDisplayDate(reg.cancelledAt)}</div>
-                              {reg.cancellationReason && (
-                                <div className="text-[11px] text-slate-400 truncate" title={reg.cancellationReason}>
-                                  Reason: {reg.cancellationReason}
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <div className="text-slate-800 font-medium">Registered: {formatDisplayDate(reg.createdAt)}</div>
-                              <div className="text-[11px] text-emerald-600 font-semibold">Seat Confirmed</div>
-                            </>
+                          {reg.cancellationReason && (
+                            <div className="break-words text-[11px] text-slate-400">
+                              Reason: {reg.cancellationReason}
+                            </div>
                           )}
-                        </div>
-                      </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="font-medium text-slate-800">
+                            Registered: {formatDisplayDate(reg.createdAt)}
+                          </div>
+                          <div className="text-[11px] font-semibold text-emerald-600">Seat Confirmed</div>
+                        </>
+                      )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-2 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                    <button
-                      onClick={() => setDetailModalRegistration(reg)}
-                      className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-2xs transition-colors"
-                    >
-                      View Details
-                    </button>
-
-                    {!isCancelled && (
-                      <button
-                        type="button"
-                        disabled={eventStarted}
-                        onClick={() => handleOpenCancelDialog(reg)}
-                        title={
-                          eventStarted
-                            ? 'Cannot cancel registration for an event that has already started'
-                            : 'Cancel Ticket'
-                        }
-                        className={`px-3 py-2 rounded-xl text-xs font-semibold shadow-2xs transition-colors ${
-                          eventStarted
-                            ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed select-none'
-                            : 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700'
-                        }`}
+                {whatsAppGroupUrl && (
+                  <section className="w-full min-w-0 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5">
+                    <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <MessageCircle
+                          className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700"
+                          aria-hidden="true"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <h4 className="break-words text-sm font-bold text-slate-900">
+                            Stay Updated on WhatsApp
+                          </h4>
+                          <p className="mt-1 break-words text-xs leading-relaxed text-slate-600">
+                            Join the official event group for announcements, schedule changes, and important updates.
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={whatsAppGroupUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Join the WhatsApp group for ${event.title || 'this event'}`}
+                        className="inline-flex w-full max-w-full items-center justify-center gap-2 whitespace-normal break-words rounded-xl bg-emerald-700 px-4 py-2.5 text-center text-xs font-bold text-white transition-colors hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 md:w-auto md:shrink-0"
                       >
-                        {eventStarted ? 'Event Started' : 'Cancel Ticket'}
-                      </button>
-                    )}
-                  </div>
+                        <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        Join WhatsApp Group
+                      </a>
+                    </div>
+                  </section>
+                )}
+                {reg.status === 'registered' && whatsAppLinkErrors[eventId] && (
+                  <p role="status" className="w-full min-w-0 break-words text-xs text-amber-700">
+                    {whatsAppLinkErrors[eventId]}
+                  </p>
+                )}
+
+                <div className="flex min-w-0 flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+                  <button
+                    onClick={() => setDetailModalRegistration(reg)}
+                    className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:bg-slate-50"
+                  >
+                    View Details
+                  </button>
+
+                  {!isCancelled && (
+                    <button
+                      type="button"
+                      disabled={eventStarted}
+                      onClick={() => handleOpenCancelDialog(reg)}
+                      title={
+                        eventStarted
+                          ? 'Cannot cancel registration for an event that has already started'
+                          : 'Cancel Ticket'
+                      }
+                      className={`min-w-0 rounded-xl px-3 py-2 text-xs font-semibold shadow-2xs transition-colors ${
+                        eventStarted
+                          ? 'cursor-not-allowed select-none border border-slate-200 bg-slate-100 text-slate-400'
+                          : 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                      }`}
+                    >
+                      {eventStarted ? 'Event Started' : 'Cancel Ticket'}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -483,6 +572,13 @@ export default function ParticipantRegistrationsPage() {
                     )}
                   </div>
                 )}
+
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+                  <span className="font-semibold text-slate-600">Current Academic Year</span>
+                  <span className="font-bold text-slate-800">
+                    {formatAcademicYear(reg.academicYear)}
+                  </span>
+                </div>
 
                 {/* Cancellation Details */}
                 {reg.status === 'cancelled' && (

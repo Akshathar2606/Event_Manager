@@ -1,6 +1,10 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getRoleHomePath } from '../src/utils/roles.js';
+import {
+  getPostLoginPath,
+  getRoleHomePath,
+  hasAllowedRole
+} from '../src/utils/roles.js';
 import { extractErrorMessage } from '../src/services/authService.js';
 import { getStoredToken, setStoredToken, clearStoredToken } from '../src/services/api.js';
 
@@ -34,6 +38,32 @@ describe('Client-Side Auth & Navigation Unit Tests', () => {
 
     test('resolves vendor to /vendor', () => {
       assert.equal(getRoleHomePath('vendor'), '/vendor');
+    });
+
+    test('login destination selects each authenticated role dashboard', () => {
+      for (const [role, destination] of [
+        ['organizer', '/organizer'],
+        ['participant', '/participant'],
+        ['administrator', '/admin'],
+        ['vendor', '/vendor']
+      ]) {
+        assert.equal(getPostLoginPath(role, undefined), destination);
+      }
+    });
+
+    test('login preserves a protected destination, including a forbidden one that remains role-guarded', () => {
+      assert.equal(getPostLoginPath('organizer', '/organizer/events'), '/organizer/events');
+      assert.equal(getPostLoginPath('organizer', '/participant'), '/participant');
+      assert.equal(
+        hasAllowedRole('organizer', ['participant', 'administrator']),
+        false
+      );
+    });
+
+    test('dashboard and access checks normalize role casing without changing role grants', () => {
+      assert.equal(getRoleHomePath(' Organizer '), '/organizer');
+      assert.equal(hasAllowedRole('ORGANIZER', ['organizer']), true);
+      assert.equal(hasAllowedRole('ORGANIZER', ['participant']), false);
     });
 
     test('defaults unknown or null role to /participant', () => {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getRoleHomePath } from '../../utils/roles';
 import {
   Eye,
   EyeOff,
@@ -20,7 +21,7 @@ import {
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 export default function RegisterPage() {
-  const { register, submitting, authError, clearError, getHomePath } = useAuth();
+  const { register, submitting, authError, clearError } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -99,7 +100,7 @@ export default function RegisterPage() {
     });
 
     if (result.success) {
-      navigate(getHomePath(), { replace: true });
+      navigate(getRoleHomePath(result.user?.role), { replace: true });
     }
   };
 
