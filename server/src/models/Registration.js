@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { STUDENT_YEARS } = require('./Event');
 
 const REGISTRATION_STATUS = ['registered', 'cancelled'];
+const ATTENDANCE_STATUS = ['not_marked', 'present', 'absent'];
 
 const registrationSchema = new mongoose.Schema(
   {
@@ -44,6 +45,20 @@ const registrationSchema = new mongoose.Schema(
       maxlength: [500, 'Cancellation reason cannot exceed 500 characters'],
       default: ''
     },
+    attendanceStatus: {
+      type: String,
+      enum: ATTENDANCE_STATUS,
+      default: 'not_marked'
+    },
+    attendanceMarkedAt: {
+      type: Date,
+      default: null
+    },
+    attendanceMarkedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
     isArchived: {
       type: Boolean,
       default: false
@@ -74,10 +89,12 @@ const registrationSchema = new mongoose.Schema(
 registrationSchema.index({ event: 1, participant: 1 }, { unique: true });
 registrationSchema.index({ participant: 1, status: 1 });
 registrationSchema.index({ event: 1, status: 1 });
+registrationSchema.index({ event: 1, attendanceStatus: 1, status: 1 });
 
 const Registration = mongoose.model('Registration', registrationSchema);
 
 module.exports = {
   Registration,
-  REGISTRATION_STATUS
+  REGISTRATION_STATUS,
+  ATTENDANCE_STATUS
 };

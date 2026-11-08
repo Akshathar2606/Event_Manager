@@ -2,7 +2,23 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const USER_ROLES = ['administrator', 'organizer', 'participant', 'vendor'];
-const PUBLIC_ALLOWED_ROLES = ['participant', 'organizer'];
+const PUBLIC_ALLOWED_ROLES = ['participant', 'organizer', 'vendor'];
+
+const socialLinkSchema = new mongoose.Schema(
+  {
+    label: {
+      type: String,
+      trim: true,
+      maxlength: [30, 'Social link label cannot exceed 30 characters']
+    },
+    url: {
+      type: String,
+      trim: true,
+      maxlength: [2048, 'Social link URL cannot exceed 2048 characters']
+    }
+  },
+  { _id: false }
+);
 
 const userSchema = new mongoose.Schema(
   {
@@ -12,6 +28,18 @@ const userSchema = new mongoose.Schema(
       trim: true,
       minlength: [2, 'Name must be at least 2 characters long'],
       maxlength: [100, 'Name cannot exceed 100 characters']
+    },
+    firstName: {
+      type: String,
+      trim: true,
+      maxlength: [50, 'First name cannot exceed 50 characters'],
+      default: ''
+    },
+    lastName: {
+      type: String,
+      trim: true,
+      maxlength: [50, 'Last name cannot exceed 50 characters'],
+      default: ''
     },
     email: {
       type: String,
@@ -60,6 +88,26 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: ''
+    },
+    location: {
+      type: String,
+      trim: true,
+      maxlength: [120, 'Location cannot exceed 120 characters'],
+      default: ''
+    },
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Bio cannot exceed 500 characters'],
+      default: ''
+    },
+    interests: {
+      type: [{ type: String, trim: true, maxlength: 40 }],
+      default: []
+    },
+    socialLinks: {
+      type: [socialLinkSchema],
+      default: []
     },
     isActive: {
       type: Boolean,
@@ -110,10 +158,16 @@ userSchema.methods.toSafeObject = function () {
   return {
     id: this._id ? this._id.toString() : this.id,
     name: this.name,
+    firstName: this.firstName || '',
+    lastName: this.lastName || '',
     email: this.email,
     role: this.role,
     phone: this.phone || '',
     organization: this.organization || '',
+    location: this.location || '',
+    bio: this.bio || '',
+    interests: this.interests || [],
+    socialLinks: this.socialLinks || [],
     isActive: this.isActive,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt

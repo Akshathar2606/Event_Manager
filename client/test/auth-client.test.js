@@ -5,8 +5,14 @@ import {
   getRoleHomePath,
   hasAllowedRole
 } from '../src/utils/roles.js';
-import { extractErrorMessage } from '../src/services/authService.js';
-import { getStoredToken, setStoredToken, clearStoredToken } from '../src/services/api.js';
+import { authService, extractErrorMessage } from '../src/services/authService.js';
+import api, { getStoredToken, setStoredToken, clearStoredToken } from '../src/services/api.js';
+import {
+  isThemePreference,
+  readThemePreference,
+  resolveTheme,
+  writeThemePreference
+} from '../src/utils/theme.js';
 
 // Setup mock sessionStorage for Node.js test environment
 const mockStorage = new Map();
@@ -38,6 +44,17 @@ describe('Client-Side Auth & Navigation Unit Tests', () => {
 
     test('resolves vendor to /vendor', () => {
       assert.equal(getRoleHomePath('vendor'), '/vendor');
+    });
+
+    test('routes pending and rejected vendors to application status instead of vendor tools', () => {
+      for (const status of ['pending', 'rejected']) {
+        assert.equal(getRoleHomePath('vendor', status), '/vendor/application-status');
+        assert.equal(
+          getPostLoginPath('vendor', '/vendor/profile', status),
+          '/vendor/application-status'
+        );
+      }
+      assert.equal(getRoleHomePath('vendor', 'approved'), '/vendor');
     });
 
     test('login destination selects each authenticated role dashboard', () => {
@@ -109,6 +126,92 @@ describe('Client-Side Auth & Navigation Unit Tests', () => {
 
     test('falls back to default message if no error response', () => {
       assert.equal(extractErrorMessage(null, 'Custom fallback'), 'Custom fallback');
+    });
+
+    describe('Theme preferences', () => {
+      test('supports light, dark, and system preference resolution', () => {
+        assert.equal(resolveTheme('light', true), 'light');
+        assert.equal(resolveTheme('dark', false), 'dark');
+        assert.equal(resolveTheme('system', true), 'dark');
+        assert.equal(resolveTheme('system', false), 'light');
+        assert.equal(isThemePreference('system'), true);
+        assert.equal(isThemePreference('sepia'), false);
+      });
+
+      test('persists and restores a valid theme preference', () => {
+        const themeStorage = new Map();
+        const storage = {
+          getItem: (key) => themeStorage.get(key) ?? null,
+          setItem: (key, value) => themeStorage.set(key, value)
+        };
+
+        writeThemePreference(storage, 'dark');
+        assert.equal(themeStorage.get('eventflow_theme'), 'dark');
+        assert.equal(readThemePreference(storage), 'dark');
+        themeStorage.set('eventflow_theme', 'invalid');
+        assert.equal(readThemePreference(storage), 'system');
+      });
+    });
+
+    test('updates only the current authenticated profile endpoint', async () => {
+      let request = null;
+      api.patch = async (url, data) => {
+        request = { url, data };
+        return { data: { success: true, user: { id: 'user-1', name: 'Jordan Lee' } } };
+      };
+
+      const profileData = { firstName: 'Jordan', lastName: 'Lee', interests: ['Design'] };
+      const user = await authService.updateMyProfile(profileData);
+      assert.deepEqual(request, { url: '/auth/me', data: profileData });
+      assert.equal(user.name, 'Jordan Lee');
+    });
+
+    test('registration submits vendor business information through the existing auth endpoint', async () => {
+      const originalPost = api.post;
+      let request = null;
+      const vendorApplication = {
+        businessName: 'Campus Kitchen',
+        businessCategory: 'Catering',
+        businessDescription: 'Fresh meals for campus events and gatherings.',
+        contactNumber: '5551234567',
+        city: 'Springfield',
+        locality: 'Downtown',
+        servicesOffered: ['Catering']
+      };
+      api.post = async (url, data) => {
+        request = { url, data };
+        return {
+          data: {
+            token: 'vendor-token',
+            user: { id: 'vendor-1', role: 'vendor', vendorApplicationStatus: 'pending' }
+          }
+        };
+      };
+
+      try {
+        const result = await authService.register({
+          name: 'Taylor Vendor',
+          email: 'vendor@example.com',
+          password: 'VendorPassword123',
+          role: 'vendor',
+          vendorApplication
+        });
+        assert.equal(result.user.vendorApplicationStatus, 'pending');
+        assert.deepEqual(request, {
+          url: '/auth/register',
+          data: {
+            name: 'Taylor Vendor',
+            email: 'vendor@example.com',
+            password: 'VendorPassword123',
+            role: 'vendor',
+            phone: undefined,
+            organization: undefined,
+            vendorApplication
+          }
+        });
+      } finally {
+        api.post = originalPost;
+      }
     });
   });
 });

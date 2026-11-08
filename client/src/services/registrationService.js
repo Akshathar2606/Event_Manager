@@ -78,6 +78,22 @@ export const registrationService = {
     return response.data;
   },
 
+  async getEventAttendeeIds(eventId, params = {}) {
+    const queryParams = { ...params };
+    Object.keys(queryParams).forEach((key) => {
+      if (queryParams[key] === undefined || queryParams[key] === null || queryParams[key] === '') {
+        delete queryParams[key];
+      }
+    });
+    const response = await api.get(`/events/${eventId}/attendees/ids`, { params: queryParams });
+    return response.data;
+  },
+
+  async updateEventAttendance(eventId, updates) {
+    const response = await api.patch(`/events/${eventId}/attendees/attendance`, { updates });
+    return response.data;
+  },
+
   /**
    * Retrieve the event WhatsApp invite link for an active registration.
    * @param {string} eventId - Event ObjectId

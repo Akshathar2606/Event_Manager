@@ -1,12 +1,15 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const { User, PUBLIC_ALLOWED_ROLES } = require('../models/User');
+const { User } = require('../models/User');
+const { VendorApplication } = require('../models/VendorApplication');
+const { notifyAdministrators } = require('../services/workflowService');
 const {
   validateRegistrationInput,
   validateLoginInput,
   validateForgotPasswordInput,
-  validateResetPasswordInput
+  validateResetPasswordInput,
+  validateProfileUpdateInput
 } = require('../utils/validation');
 const { signToken } = require('../utils/token');
 const {
@@ -28,24 +31,84 @@ const getStore = (req) => {
     : null;
 };
 
+const getVendorApplicationStore = (req) => {
+  if (!req.app || !req.app.locals) return null;
+  if (!req.app.locals.mockVendorApplicationStore) {
+    req.app.locals.mockVendorApplicationStore = new Map();
+  }
+  return req.app.locals.mockVendorApplicationStore;
+};
+
+const getVendorApplicationStatus = async (req, userId, role) => {
+  if (role !== 'vendor') return {};
+
+  const mockStore = req.app?.locals?.mockVendorApplicationStore;
+  if (mockStore) {
+    const application = mockStore.get(String(userId));
+    return {
+      vendorApplicationStatus: application?.status || 'approved',
+      vendorRejectionReason: application?.status === 'rejected'
+        ? application.rejectionReason || ''
+        : ''
+    };
+  }
+
+  const application = await VendorApplication.findOne({ vendorId: userId })
+    .select('status rejectionReason')
+    .lean();
+  return {
+    vendorApplicationStatus: application?.status || 'approved',
+    vendorRejectionReason: application?.status === 'rejected'
+      ? application.rejectionReason || ''
+      : ''
+  };
+};
+
+const toSafeUserObject = (user, vendorApplicationStatus = {}) => ({
+  id: user.id || (user._id ? user._id.toString() : undefined),
+  name: user.name,
+  firstName: user.firstName || '',
+  lastName: user.lastName || '',
+  email: user.email,
+  role: user.role,
+  phone: user.phone || '',
+  organization: user.organization || '',
+  location: user.location || '',
+  bio: user.bio || '',
+  interests: user.interests || [],
+  socialLinks: user.socialLinks || [],
+  isActive: user.isActive,
+  ...(user.role === 'vendor' ? vendorApplicationStatus : {}),
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt
+});
+
 /**
  * POST /api/auth/register
- * Public registration endpoint for 'participant' and 'organizer' roles only.
+ * Public registration endpoint for participants, organizers, and vendor applicants.
  */
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, role, phone, organization } = req.body;
+    const { name, email, password, role, phone, organization, vendorApplication } = req.body;
 
     // Validate inputs
-    const validation = validateRegistrationInput({ name, email, password, role, phone, organization });
+    const validation = validateRegistrationInput({
+      name,
+      email,
+      password,
+      role,
+      phone,
+      organization,
+      vendorApplication
+    });
 
     if (!validation.isValid) {
-      // If client attempted to self-assign administrator or vendor, return 403 Forbidden
+      // Administrator accounts must be provisioned by an existing administrator.
       const targetRole = role ? String(role).trim().toLowerCase() : '';
-      if (['administrator', 'vendor'].includes(targetRole)) {
+      if (targetRole === 'administrator') {
         return res.status(403).json({
           success: false,
-          message: `Self-registration as '${targetRole}' is strictly forbidden. Administrator and vendor accounts must be provisioned through administrative onboarding.`,
+          message: 'Self-registration as an administrator is strictly forbidden.',
           errors: validation.errors
         });
       }
@@ -85,14 +148,52 @@ const register = async (req, res, next) => {
       };
       mockStore.set(newUser.id, newUser);
 
+      let application = null;
+      if (sanitized.role === 'vendor') {
+        const applicationStore = getVendorApplicationStore(req);
+        if (applicationStore.has(newUser.id)) {
+          mockStore.delete(newUser.id);
+          return res.status(409).json({
+            success: false,
+            message: 'A vendor application already exists for this account.'
+          });
+        }
+        application = {
+          id: new mongoose.Types.ObjectId().toString(),
+          vendorId: newUser.id,
+          ...sanitized.vendorApplication,
+          status: 'pending',
+          rejectionReason: '',
+          reviewedBy: null,
+          reviewedAt: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        applicationStore.set(newUser.id, application);
+        await notifyAdministrators(req, {
+          actorId: newUser.id,
+          type: 'vendor_application_submitted',
+          title: 'New vendor application',
+          message: `${application.businessName} submitted a vendor application.`,
+          entityType: 'vendorApplication',
+          entityId: application.id,
+          dedupeKey: `vendor-application-submitted:${application.id}`
+        });
+      }
+
       const token = signToken(newUser);
-      const { passwordHash: _, ...safeUser } = newUser;
+      const safeUser = toSafeUserObject(newUser, application
+        ? { vendorApplicationStatus: application.status, vendorRejectionReason: '' }
+        : {});
 
       return res.status(201).json({
         success: true,
-        message: 'User registered successfully.',
+        message: application
+          ? 'Vendor application submitted. Administrator approval is required before vendor access is enabled.'
+          : 'User registered successfully.',
         token,
-        user: safeUser
+        user: safeUser,
+        ...(application && { application: { id: application.id, status: application.status } })
       });
     }
 
@@ -107,27 +208,72 @@ const register = async (req, res, next) => {
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(sanitized.password, salt);
+    let user;
+    let application = null;
 
-    const user = await User.create({
-      name: sanitized.name,
-      email: sanitized.email,
-      passwordHash,
-      role: sanitized.role,
-      phone: sanitized.phone,
-      organization: sanitized.organization,
-      isActive: true
-    });
+    if (sanitized.role === 'vendor') {
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          const [createdUser] = await User.create([{
+            name: sanitized.name,
+            email: sanitized.email,
+            passwordHash,
+            role: sanitized.role,
+            phone: sanitized.phone,
+            organization: sanitized.organization,
+            isActive: true
+          }], { session });
+          const [createdApplication] = await VendorApplication.create([{
+            vendorId: createdUser._id,
+            ...sanitized.vendorApplication,
+            status: 'pending'
+          }], { session });
+          user = createdUser;
+          application = createdApplication;
+        });
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      user = await User.create({
+        name: sanitized.name,
+        email: sanitized.email,
+        passwordHash,
+        role: sanitized.role,
+        phone: sanitized.phone,
+        organization: sanitized.organization,
+        isActive: true
+      });
+    }
 
     const token = signToken(user);
+    const applicationStatus = application
+      ? { vendorApplicationStatus: application.status, vendorRejectionReason: '' }
+      : {};
+    if (application) {
+      await notifyAdministrators(req, {
+        actorId: user._id,
+        type: 'vendor_application_submitted',
+        title: 'New vendor application',
+        message: `${application.businessName} submitted a vendor application.`,
+        entityType: 'vendorApplication',
+        entityId: application._id,
+        dedupeKey: `vendor-application-submitted:${application._id}`
+      });
+    }
 
     return res.status(201).json({
       success: true,
-      message: 'User registered successfully.',
+      message: application
+        ? 'Vendor application submitted. Administrator approval is required before vendor access is enabled.'
+        : 'User registered successfully.',
       token,
-      user: user.toSafeObject()
+      user: { ...user.toSafeObject(), ...applicationStatus },
+      ...(application && { application: { id: application.id, status: application.status } })
     });
   } catch (error) {
-    if (error.code === 11000) {
+    if (error.code === 11000 || error.code === 'DUPLICATE_EMAIL') {
       return res.status(409).json({
         success: false,
         message: 'Email is already registered.'
@@ -182,7 +328,8 @@ const login = async (req, res, next) => {
       }
 
       const token = signToken(user);
-      const { passwordHash: _, ...safeUser } = user;
+      const applicationStatus = await getVendorApplicationStatus(req, user.id, user.role);
+      const safeUser = toSafeUserObject(user, applicationStatus);
 
       return res.status(200).json({
         success: true,
@@ -217,12 +364,13 @@ const login = async (req, res, next) => {
     }
 
     const token = signToken(user);
+    const applicationStatus = await getVendorApplicationStatus(req, user._id, user.role);
 
     return res.status(200).json({
       success: true,
       message: 'Login successful.',
       token,
-      user: user.toSafeObject()
+      user: { ...user.toSafeObject(), ...applicationStatus }
     });
   } catch (error) {
     next(error);
@@ -411,10 +559,64 @@ const getMe = async (req, res, next) => {
   }
 };
 
+/**
+ * PATCH /api/auth/me
+ * Updates only the authenticated user's permitted profile fields.
+ */
+const updateMe = async (req, res, next) => {
+  try {
+    const validation = validateProfileUpdateInput(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed.',
+        errors: validation.errors
+      });
+    }
+
+    const mockStore = getStore(req);
+    if (mockStore) {
+      const user = mockStore.get(req.user.id);
+      if (!user || !user.isActive) {
+        return res.status(404).json({
+          success: false,
+          message: 'User profile was not found.'
+        });
+      }
+
+      Object.assign(user, validation.sanitized, { updatedAt: new Date().toISOString() });
+      return res.status(200).json({
+        success: true,
+        message: 'Profile updated successfully.',
+        user: toSafeUserObject(user)
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user || !user.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'User profile was not found.'
+      });
+    }
+
+    user.set(validation.sanitized);
+    await user.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully.',
+      user: user.toSafeObject()
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   forgotPassword,
   resetPassword,
-  getMe
+  getMe,
+  updateMe
 };

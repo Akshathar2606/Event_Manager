@@ -106,7 +106,7 @@ export default function OrganizerCateringRequestsPage() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+      <div className="bg-surface rounded-2xl border border-border p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -115,10 +115,10 @@ export default function OrganizerCateringRequestsPage() {
                 Organizer Tracker
               </span>
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-extrabold text-text-primary tracking-tight">
               My Catering Requests
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-text-muted">
               Track vendor proposals, review catering decisions, and manage banquet contracts across your events.
             </p>
           </div>
@@ -135,7 +135,7 @@ export default function OrganizerCateringRequestsPage() {
             <button
               type="button"
               onClick={() => fetchRequests(pagination.page)}
-              className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+              className="p-2.5 rounded-xl border border-border bg-surface text-text-secondary hover:bg-background hover:text-text-primary transition-colors"
               title="Refresh request list"
             >
               <RefreshCw className="w-4 h-4" />
@@ -173,7 +173,7 @@ export default function OrganizerCateringRequestsPage() {
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap shrink-0 ${
                 isActive
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  : 'bg-surface text-text-secondary border-border hover:bg-background'
               }`}
             >
               {tab.label}
@@ -184,17 +184,17 @@ export default function OrganizerCateringRequestsPage() {
 
       {/* Requests List */}
       {loading ? (
-        <div className="py-20 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center text-slate-400">
+        <div className="py-20 bg-surface rounded-2xl border border-border shadow-xs flex flex-col items-center justify-center text-text-muted">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-2" />
           <p className="text-sm font-medium">Loading your catering proposals...</p>
         </div>
       ) : requests.length === 0 ? (
-        <div className="py-16 px-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs text-center">
+        <div className="py-16 px-4 bg-surface rounded-2xl border border-border shadow-xs text-center">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3">
             <UtensilsCrossed className="w-6 h-6" />
           </div>
-          <h3 className="font-semibold text-slate-800 text-base">No catering requests found</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          <h3 className="font-semibold text-text-primary text-base">No catering requests found</h3>
+          <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
             {activeStatus
               ? `You currently have no ${activeStatus} catering proposals.`
               : 'You have not submitted any catering proposals yet.'}
@@ -218,7 +218,7 @@ export default function OrganizerCateringRequestsPage() {
             return (
               <div
                 key={req.id || req._id}
-                className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between"
+                className="bg-surface rounded-2xl border border-border p-5 sm:p-6 shadow-xs hover:border-border-strong transition-all flex flex-col justify-between"
               >
                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                   {/* Left: Event & Vendor Info */}
@@ -232,21 +232,21 @@ export default function OrganizerCateringRequestsPage() {
                       </span>
 
                       {req.event?.category && (
-                        <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 capitalize">
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-subtle text-text-secondary capitalize">
                           {req.event.category}
                         </span>
                       )}
 
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-[11px] text-text-muted">
                         Submitted: {formatDisplayDateTime(req.createdAt)}
                       </span>
                     </div>
 
-                    <h3 className="font-bold text-slate-900 text-lg leading-snug">
+                    <h3 className="font-bold text-text-primary text-lg leading-snug">
                       {req.event?.title || 'Campus Event'}
                     </h3>
 
-                    <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-text-muted">
                       <div className="flex items-center gap-1">
                         <UtensilsCrossed className="w-3.5 h-3.5 text-amber-600" />
                         <span>Vendor: <strong>{req.cateringService?.businessName || req.vendor?.organization || req.vendor?.name || 'Campus Caterer'}</strong></span>
@@ -260,9 +260,9 @@ export default function OrganizerCateringRequestsPage() {
                   </div>
 
                   {/* Right: Package Snapshot & Quoted Amount */}
-                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between lg:flex-col lg:items-end lg:justify-center gap-2 min-w-[180px]">
+                  <div className="p-3.5 bg-background rounded-xl border border-border flex items-center justify-between lg:flex-col lg:items-end lg:justify-center gap-2 min-w-[180px]">
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">
+                      <span className="text-text-muted block text-[10px] uppercase font-semibold">
                         Authoritative Quote
                       </span>
                       <span className="text-xl font-black text-amber-700">
@@ -270,10 +270,10 @@ export default function OrganizerCateringRequestsPage() {
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-semibold text-slate-700 block">
+                      <span className="text-xs font-semibold text-text-secondary block">
                         {req.guestCount} guests
                       </span>
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-[11px] text-text-muted">
                         ${req.pricePerPlate}/plate ({req.selectedPackage?.name})
                       </span>
                     </div>
@@ -302,20 +302,20 @@ export default function OrganizerCateringRequestsPage() {
                 )}
 
                 {req.status === 'cancelled' && (
-                  <div className="mt-3.5 p-3 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-600 flex items-start gap-2">
-                    <Ban className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                  <div className="mt-3.5 p-3 rounded-xl bg-surface-subtle border border-border text-xs text-text-secondary flex items-start gap-2">
+                    <Ban className="w-4 h-4 text-text-muted shrink-0 mt-0.5" />
                     <div>
                       <span>Cancelled on {formatDisplayDateTime(req.cancelledAt || req.updatedAt)}</span>
                       {req.cancellationReason && (
-                        <p className="mt-0.5 italic text-slate-500">Reason: "{req.cancellationReason}"</p>
+                        <p className="mt-0.5 italic text-text-muted">Reason: "{req.cancellationReason}"</p>
                       )}
                     </div>
                   </div>
                 )}
 
                 {/* Bottom Row Actions */}
-                <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-xs text-slate-400 truncate max-w-sm">
+                <div className="mt-4 pt-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs text-text-muted truncate max-w-sm">
                     {req.notes ? (
                       <span>Notes: <em>"{req.notes}"</em></span>
                     ) : (
@@ -327,7 +327,7 @@ export default function OrganizerCateringRequestsPage() {
                     <button
                       type="button"
                       onClick={() => setSelectedRequest(req)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Details</span>
@@ -357,7 +357,7 @@ export default function OrganizerCateringRequestsPage() {
 
       {/* Pagination Controls */}
       {pagination.pages > 1 && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs flex items-center justify-between text-xs text-slate-500">
+        <div className="bg-surface rounded-2xl border border-border p-4 shadow-xs flex items-center justify-between text-xs text-text-muted">
           <div>
             Showing Page <strong>{pagination.page}</strong> of <strong>{pagination.pages}</strong> ({pagination.total} proposals)
           </div>
@@ -366,7 +366,7 @@ export default function OrganizerCateringRequestsPage() {
               type="button"
               disabled={pagination.page <= 1 || loading}
               onClick={() => fetchRequests(pagination.page - 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-background disabled:opacity-40"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               <span>Previous</span>
@@ -375,7 +375,7 @@ export default function OrganizerCateringRequestsPage() {
               type="button"
               disabled={pagination.page >= pagination.pages || loading}
               onClick={() => fetchRequests(pagination.page + 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-background disabled:opacity-40"
             >
               <span>Next</span>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -386,74 +386,74 @@ export default function OrganizerCateringRequestsPage() {
 
       {/* Detail Modal */}
       {selectedRequest && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-2xl w-full p-6 sm:p-8 animate-fadeIn max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-2xl w-full p-6 sm:p-8 animate-fadeIn max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-slate-100 shrink-0">
+            <div className="flex items-start justify-between pb-4 border-b border-border shrink-0">
               <div>
                 <span
                   className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border mb-1 ${getCateringRequestStatusBadge(selectedRequest.status).classes}`}
                 >
                   {getCateringRequestStatusBadge(selectedRequest.status).label}
                 </span>
-                <h3 className="font-extrabold text-xl text-slate-900">
+                <h3 className="font-extrabold text-xl text-text-primary">
                   {selectedRequest.event?.title || 'Campus Event'}
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-text-muted mt-0.5">
                   Request ID: <span className="font-mono">{selectedRequest.id || selectedRequest._id}</span>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedRequest(null)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-text-muted hover:text-text-secondary p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Scrollable Content */}
-            <div className="py-5 overflow-y-auto space-y-5 text-sm text-slate-600 pr-1">
+            <div className="py-5 overflow-y-auto space-y-5 text-sm text-text-secondary pr-1">
               {/* Event & Schedule */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-background rounded-xl border border-border text-xs">
                 <div>
-                  <span className="text-slate-400 block font-semibold uppercase text-[10px]">Catering Partner</span>
-                  <span className="font-bold text-slate-800 text-sm">
+                  <span className="text-text-muted block font-semibold uppercase text-[10px]">Catering Partner</span>
+                  <span className="font-bold text-text-primary text-sm">
                     {selectedRequest.cateringService?.businessName || selectedRequest.vendor?.organization || selectedRequest.vendor?.name}
                   </span>
                   {selectedRequest.cateringService?.serviceArea && (
-                    <span className="text-slate-500 block">Service Area: {selectedRequest.cateringService.serviceArea}</span>
+                    <span className="text-text-muted block">Service Area: {selectedRequest.cateringService.serviceArea}</span>
                   )}
                   {selectedRequest.vendor?.email && (
-                    <span className="text-slate-500 block">Contact: {selectedRequest.vendor.email}</span>
+                    <span className="text-text-muted block">Contact: {selectedRequest.vendor.email}</span>
                   )}
                 </div>
 
                 <div>
-                  <span className="text-slate-400 block font-semibold uppercase text-[10px]">Service Delivery Time</span>
-                  <span className="font-bold text-slate-800 text-sm">
+                  <span className="text-text-muted block font-semibold uppercase text-[10px]">Service Delivery Time</span>
+                  <span className="font-bold text-text-primary text-sm">
                     {formatDisplayDateTime(selectedRequest.serviceDateTime || selectedRequest.event?.startDateTime)}
                   </span>
-                  <span className="text-slate-500 block">Submitted: {formatDisplayDateTime(selectedRequest.createdAt)}</span>
+                  <span className="text-text-muted block">Submitted: {formatDisplayDateTime(selectedRequest.createdAt)}</span>
                 </div>
               </div>
 
               {/* Package Snapshot */}
               <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
                   Selected Menu Package Snapshot
                 </h4>
-                <div className="p-4 rounded-xl border border-slate-200 bg-white">
+                <div className="p-4 rounded-xl border border-border bg-surface">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
-                      <h5 className="font-bold text-slate-900 text-base">{selectedRequest.selectedPackage?.name}</h5>
-                      <p className="text-xs text-slate-500">{selectedRequest.selectedPackage?.description}</p>
+                      <h5 className="font-bold text-text-primary text-base">{selectedRequest.selectedPackage?.name}</h5>
+                      <p className="text-xs text-text-muted">{selectedRequest.selectedPackage?.description}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <span className="font-black text-amber-700 text-base block">
                         ${selectedRequest.pricePerPlate}/plate
                       </span>
-                      <span className="text-[11px] text-slate-400">Headcount: {selectedRequest.guestCount} guests</span>
+                      <span className="text-[11px] text-text-muted">Headcount: {selectedRequest.guestCount} guests</span>
                     </div>
                   </div>
 
@@ -473,15 +473,15 @@ export default function OrganizerCateringRequestsPage() {
 
                   {/* Menu courses */}
                   {(selectedRequest.selectedPackage?.menuItems || []).length > 0 && (
-                    <div className="pt-2 border-t border-slate-100">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                    <div className="pt-2 border-t border-border">
+                      <span className="text-[10px] font-bold text-text-muted uppercase block mb-1">
                         Included Dishes & Courses:
                       </span>
                       <div className="flex flex-wrap gap-1.5">
                         {selectedRequest.selectedPackage.menuItems.map((item, idx) => (
                           <span
                             key={idx}
-                            className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[11px]"
+                            className="inline-block px-2 py-0.5 bg-surface-subtle text-text-secondary rounded-md text-[11px]"
                           >
                             {item}
                           </span>
@@ -496,7 +496,7 @@ export default function OrganizerCateringRequestsPage() {
               <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-xl flex items-center justify-between">
                 <div>
                   <span className="text-xs font-bold text-amber-900 block">Server-Confirmed Total Quote</span>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-text-muted">
                     Calculated at ${selectedRequest.pricePerPlate} × {selectedRequest.guestCount} attendees
                   </span>
                 </div>
@@ -508,10 +508,10 @@ export default function OrganizerCateringRequestsPage() {
               {/* Organizer Notes */}
               {selectedRequest.notes && (
                 <div>
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">
                     Organizer Setup Instructions
                   </h4>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-700">
+                  <div className="p-3 bg-background rounded-xl border border-border text-xs text-text-secondary">
                     "{selectedRequest.notes}"
                   </div>
                 </div>
@@ -544,12 +544,12 @@ export default function OrganizerCateringRequestsPage() {
             </div>
 
             {/* Footer */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between shrink-0">
-              <span className="text-xs text-slate-400">Status is updated in real time by the caterer</span>
+            <div className="pt-4 border-t border-border flex items-center justify-between shrink-0">
+              <span className="text-xs text-text-muted">Status is updated in real time by the caterer</span>
               <button
                 type="button"
                 onClick={() => setSelectedRequest(null)}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
+                className="px-4 py-2 text-sm font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted rounded-xl"
               >
                 Close
               </button>
@@ -560,22 +560,22 @@ export default function OrganizerCateringRequestsPage() {
 
       {/* Cancellation Confirmation Modal */}
       {cancellingRequest && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 sm:p-7 animate-fadeIn">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-md w-full p-6 sm:p-7 animate-fadeIn">
             <div className="flex items-center gap-3 text-rose-600 mb-3">
               <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center border border-rose-200 shrink-0">
                 <Ban className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Cancel Catering Proposal?</h3>
-                <p className="text-xs text-slate-500">Event: {cancellingRequest.event?.title}</p>
+                <h3 className="font-bold text-text-primary text-base">Cancel Catering Proposal?</h3>
+                <p className="text-xs text-text-muted">Event: {cancellingRequest.event?.title}</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+            <p className="text-xs text-text-secondary leading-relaxed mb-4">
               Are you sure you want to cancel this catering proposal for{' '}
               <strong>{cancellingRequest.guestCount} guests</strong>? This will transition the request to
-              <strong className="text-slate-800"> Cancelled</strong>.
+              <strong className="text-text-primary"> Cancelled</strong>.
             </p>
 
             {cancellationError && (
@@ -587,8 +587,8 @@ export default function OrganizerCateringRequestsPage() {
 
             <form onSubmit={handleConfirmCancel} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Cancellation Reason <span className="text-slate-400 lowercase font-normal">(optional)</span>
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                  Cancellation Reason <span className="text-text-muted lowercase font-normal">(optional)</span>
                 </label>
                 <textarea
                   rows="2"
@@ -596,7 +596,7 @@ export default function OrganizerCateringRequestsPage() {
                   value={cancellationReason}
                   onChange={(e) => setCancellationReason(e.target.value)}
                   placeholder="e.g., Event scope changed, sponsor hosting banquet elsewhere..."
-                  className="block w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-rose-100 focus:border-rose-500"
+                  className="block w-full px-3 py-2 text-xs rounded-xl border border-border focus:outline-hidden focus:ring-2 focus:ring-rose-100 focus:border-rose-500"
                 />
               </div>
 
@@ -605,7 +605,7 @@ export default function OrganizerCateringRequestsPage() {
                   type="button"
                   disabled={cancellationSubmitting}
                   onClick={() => setCancellingRequest(null)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted rounded-xl disabled:opacity-50"
                 >
                   Keep Request
                 </button>

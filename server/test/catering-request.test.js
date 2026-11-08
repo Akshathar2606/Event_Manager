@@ -422,6 +422,38 @@ describe('EventFlow Catering Request Workflow Test Suite', () => {
       assert.match(res.body.message, /below the package minimum order of 20/i);
     });
 
+    test('Package maximum capacity is enforced and included in request snapshots', async () => {
+      standardPackage.maxGuests = 45;
+      const tooManyGuests = await request(app, {
+        method: 'POST',
+        url: '/api/catering-requests',
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          eventId: activeEvent.id,
+          cateringServiceId: activeCateringService.id,
+          packageId: standardPackage.id,
+          guestCount: 50
+        }
+      });
+      assert.equal(tooManyGuests.statusCode, 400);
+      assert.match(tooManyGuests.body.message, /maximum capacity of 45/i);
+
+      standardPackage.maxGuests = 80;
+      const validRequest = await request(app, {
+        method: 'POST',
+        url: '/api/catering-requests',
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          eventId: activeEvent.id,
+          cateringServiceId: activeCateringService.id,
+          packageId: standardPackage.id,
+          guestCount: 50
+        }
+      });
+      assert.equal(validRequest.statusCode, 201);
+      assert.equal(validRequest.body.data.selectedPackage.maxGuests, 80);
+    });
+
     test('Creation rejected if guest count exceeds event capacity (400 Bad Request)', async () => {
       // activeEvent.capacity is 150
       const res = await request(app, {

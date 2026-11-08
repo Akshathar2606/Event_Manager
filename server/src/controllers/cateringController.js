@@ -15,9 +15,46 @@ const getStore = (req) => {
     : null;
 };
 
+const splitFilterValues = (value) =>
+  (Array.isArray(value) ? value : String(value || '').split(','))
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getPackageMatches = (service, filters) => {
+  const activePackages = (service.packages || []).filter((pkg) => !pkg.isArchived);
+  if (!filters.hasPackageFilters) return activePackages;
+
+  return activePackages.filter((pkg) => {
+    const dietaryOptions = (pkg.dietaryOptions || []).map((item) => String(item).toLowerCase());
+    const minOrder = Number(pkg.minOrder ?? 10);
+    const maxGuests = pkg.maxGuests == null ? null : Number(pkg.maxGuests);
+    return filters.dietary.every((item) => dietaryOptions.includes(item.toLowerCase())) &&
+      (filters.maxPrice === null || Number(pkg.pricePerPlate) <= filters.maxPrice) &&
+      (filters.guestCount === null ||
+        (minOrder <= filters.guestCount && (maxGuests === null || filters.guestCount <= maxGuests)));
+  });
+};
+
+const toPublicService = (service, matchingPackages, distanceKm) => {
+  const result = { ...service, packages: matchingPackages };
+  delete result.contactEmail;
+  delete result.contactPhone;
+  if (result.vendorId && typeof result.vendorId === 'object') {
+    result.vendorId = result.vendorId._id
+      ? String(result.vendorId._id)
+      : (typeof result.vendorId.toHexString === 'function'
+        ? result.vendorId.toHexString()
+        : (result.vendorId.id || result.vendorId));
+  }
+  if (distanceKm !== undefined) result.distanceKm = distanceKm;
+  return result;
+};
+
 /**
  * GET /api/catering
- * Browse active catering services with search, dietary filters, cuisine filters, and pagination.
+ * Browse active catering services with location, package, and pagination filters.
  */
 const browseCateringServices = async (req, res, next) => {
   try {
@@ -26,6 +63,12 @@ const browseCateringServices = async (req, res, next) => {
       dietary,
       cuisine,
       maxPrice,
+      city,
+      locality,
+      guestCount,
+      latitude,
+      longitude,
+      radiusKm,
       page = 1,
       limit = 10
     } = req.query;
@@ -33,77 +76,112 @@ const browseCateringServices = async (req, res, next) => {
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
     const skip = (pageNum - 1) * limitNum;
+    const parsedMaxPrice = maxPrice === undefined || maxPrice === '' ? null : Number(maxPrice);
+    const parsedGuestCount = guestCount === undefined || guestCount === '' ? null : Number(guestCount);
+    if (parsedMaxPrice !== null && (!Number.isFinite(parsedMaxPrice) || parsedMaxPrice < 0)) {
+      return res.status(400).json({ success: false, message: 'maxPrice must be a non-negative number.' });
+    }
+    if (parsedGuestCount !== null && (!Number.isInteger(parsedGuestCount) || parsedGuestCount < 1)) {
+      return res.status(400).json({ success: false, message: 'guestCount must be a positive whole number.' });
+    }
+
+    const hasCompleteLocation = [latitude, longitude, radiusKm].every(
+      (value) => value !== undefined && value !== ''
+    );
+    const geoValues = hasCompleteLocation ? [Number(latitude), Number(longitude), Number(radiusKm)] : null;
+    if (
+      geoValues &&
+      (!geoValues.every(Number.isFinite) ||
+        geoValues[0] < -90 || geoValues[0] > 90 ||
+        geoValues[1] < -180 || geoValues[1] > 180 ||
+        geoValues[2] <= 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'latitude, longitude, and radiusKm must be valid coordinates and a positive radius.'
+      });
+    }
 
     const isAdmin = req.user && req.user.role === 'administrator';
     const mockStore = getStore(req);
+    const cuisines = splitFilterValues(cuisine);
+    const dietaries = splitFilterValues(dietary);
+    const normalizedFilters = {
+      dietary: dietaries,
+      maxPrice: parsedMaxPrice,
+      guestCount: parsedGuestCount,
+      hasPackageFilters: dietaries.length > 0 || parsedMaxPrice !== null || parsedGuestCount !== null
+    };
 
     // Mock store filter path (for automated unit test runner)
     if (mockStore) {
       let list = Array.from(mockStore.values());
 
-      // Filter active and non-archived
-      if (!isAdmin) {
-        list = list.filter((s) => !s.isArchived && s.isAvailable);
-      } else {
-        list = list.filter((s) => !s.isArchived);
-      }
+      list = list.filter((service) =>
+        !service.isArchived && (isAdmin || service.isAvailable !== false)
+      );
 
-      // Search keyword filter
       if (search && search.trim()) {
         const query = search.trim().toLowerCase();
-        list = list.filter(
-          (s) =>
-            s.businessName.toLowerCase().includes(query) ||
-            s.serviceArea.toLowerCase().includes(query) ||
-            (s.description && s.description.toLowerCase().includes(query))
+        list = list.filter((service) =>
+          [service.businessName, service.serviceArea, service.city, service.locality,
+            service.fullAddress, service.description, ...(service.cuisineTypes || [])]
+            .some((value) => String(value || '').toLowerCase().includes(query))
         );
       }
 
-      // Cuisine filter
-      if (cuisine) {
-        const cuisines = (Array.isArray(cuisine) ? cuisine : cuisine.split(','))
-          .map((c) => c.trim().toLowerCase())
-          .filter(Boolean);
-        if (cuisines.length > 0) {
-          list = list.filter((s) => {
-            const sc = (s.cuisineTypes || []).map((c) => c.toLowerCase());
-            return cuisines.some((c) => sc.includes(c));
-          });
-        }
+      if (city && city.trim()) {
+        list = list.filter((service) => String(service.city || '').toLowerCase() === city.trim().toLowerCase());
+      }
+      if (locality && locality.trim()) {
+        list = list.filter((service) =>
+          String(service.locality || '').toLowerCase() === locality.trim().toLowerCase()
+        );
+      }
+      if (cuisines.length > 0) {
+        list = list.filter((service) => (service.cuisineTypes || []).some((item) =>
+          cuisines.some((filter) => String(item).toLowerCase() === filter.toLowerCase())
+        ));
       }
 
-      // Dietary filter (matches services that have at least one package with requested dietary options)
-      if (dietary) {
-        const requestedDietary = (Array.isArray(dietary) ? dietary : dietary.split(','))
-          .map((d) => d.trim().toLowerCase())
-          .filter(Boolean);
+      list = list.map((service) => ({
+        service,
+        packages: getPackageMatches(service, normalizedFilters)
+      })).filter(({ packages }) => !normalizedFilters.hasPackageFilters || packages.length > 0);
 
-        if (requestedDietary.length > 0) {
-          list = list.filter((s) => {
-            const activePkgs = (s.packages || []).filter((p) => !p.isArchived);
-            return activePkgs.some((p) => {
-              const pkgDietary = (p.dietaryOptions || []).map((d) => d.toLowerCase());
-              return requestedDietary.every((rd) => pkgDietary.includes(rd));
-            });
-          });
-        }
-      }
-
-      // Max price filter
-      if (maxPrice && !isNaN(Number(maxPrice))) {
-        const max = Number(maxPrice);
-        list = list.filter((s) => {
-          const activePkgs = (s.packages || []).filter((p) => !p.isArchived);
-          return activePkgs.some((p) => p.pricePerPlate <= max);
+      if (geoValues) {
+        const [lat, lng, radius] = geoValues;
+        const radians = (degrees) => degrees * Math.PI / 180;
+        list = list.map(({ service, packages }) => {
+          const coordinates = service.location?.type === 'Point' ? service.location.coordinates : null;
+          if (!Array.isArray(coordinates) || coordinates.length !== 2) return null;
+          const [vendorLng, vendorLat] = coordinates;
+          const deltaLat = radians(vendorLat - lat);
+          const deltaLng = radians(vendorLng - lng);
+          const a = Math.sin(deltaLat / 2) ** 2 +
+            Math.cos(radians(lat)) * Math.cos(radians(vendorLat)) * Math.sin(deltaLng / 2) ** 2;
+          const distanceKm = 6371.0088 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          return distanceKm <= radius ? { service, packages, distanceKm } : null;
+        }).filter(Boolean).sort((a, b) =>
+          a.distanceKm - b.distanceKm ||
+          String(a.service.id || a.service._id || '').localeCompare(
+            String(b.service.id || b.service._id || '')
+          )
+        );
+      } else {
+        list.sort((a, b) => {
+          const createdAtDiff = new Date(b.service.createdAt || 0) - new Date(a.service.createdAt || 0);
+          if (createdAtDiff !== 0) return createdAtDiff;
+          return String(a.service.id || a.service._id || '').localeCompare(
+            String(b.service.id || b.service._id || '')
+          );
         });
       }
 
       const total = list.length;
-      const paginated = list.slice(skip, skip + limitNum).map((s) => {
-        // Exclude archived packages for public browsing
-        const cleanPackages = (s.packages || []).filter((p) => !p.isArchived);
-        return { ...s, packages: cleanPackages };
-      });
+      const paginated = list.slice(skip, skip + limitNum).map(({ service, packages, distanceKm }) =>
+        toPublicService(service, packages, distanceKm)
+      );
 
       return res.status(200).json({
         success: true,
@@ -118,56 +196,108 @@ const browseCateringServices = async (req, res, next) => {
       });
     }
 
-    // Standard MongoDB Mongoose Path
-    const query = { isArchived: false };
-    if (!isAdmin) {
-      query.isAvailable = true;
-    }
-
+    const conditions = [{ isArchived: false }];
+    if (!isAdmin) conditions.push({ isAvailable: { $ne: false } });
     if (search && search.trim()) {
-      const q = search.trim();
-      query.$or = [
-        { businessName: { $regex: q, $options: 'i' } },
-        { serviceArea: { $regex: q, $options: 'i' } }
-      ];
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
+      conditions.push({
+        $or: [
+          { businessName: searchRegex },
+          { serviceArea: searchRegex },
+          { city: searchRegex },
+          { locality: searchRegex },
+          { fullAddress: searchRegex },
+          { description: searchRegex },
+          { cuisineTypes: searchRegex }
+        ]
+      });
+    }
+    if (city && city.trim()) {
+      conditions.push({ city: new RegExp(`^${escapeRegex(city.trim())}$`, 'i') });
+    }
+    if (locality && locality.trim()) {
+      conditions.push({ locality: new RegExp(`^${escapeRegex(locality.trim())}$`, 'i') });
+    }
+    if (cuisines.length > 0) {
+      conditions.push({ cuisineTypes: { $in: cuisines.map((item) => new RegExp(`^${escapeRegex(item)}$`, 'i')) } });
     }
 
-    if (cuisine) {
-      const cuisines = (Array.isArray(cuisine) ? cuisine : cuisine.split(','))
-        .map((c) => c.trim())
-        .filter(Boolean);
-      if (cuisines.length > 0) {
-        query.cuisineTypes = { $in: cuisines };
-      }
-    }
-
-    if (dietary) {
-      const dietaries = (Array.isArray(dietary) ? dietary : dietary.split(','))
-        .map((d) => d.trim())
-        .filter(Boolean);
+    if (normalizedFilters.hasPackageFilters) {
+      const packageConditions = [{ isArchived: { $ne: true } }];
       if (dietaries.length > 0) {
-        query['packages.dietaryOptions'] = { $all: dietaries };
+        packageConditions.push({
+          dietaryOptions: { $all: dietaries.map((item) => new RegExp(`^${escapeRegex(item)}$`, 'i')) }
+        });
       }
+      if (parsedMaxPrice !== null) packageConditions.push({ pricePerPlate: { $lte: parsedMaxPrice } });
+      if (parsedGuestCount !== null) {
+        packageConditions.push({
+          $and: [
+            { $or: [{ minOrder: { $exists: false } }, { minOrder: { $lte: parsedGuestCount } }] },
+            { $or: [{ maxGuests: { $exists: false } }, { maxGuests: null }, { maxGuests: { $gte: parsedGuestCount } }] }
+          ]
+        });
+      }
+      conditions.push({ packages: { $elemMatch: { $and: packageConditions } } });
     }
 
-    if (maxPrice && !isNaN(Number(maxPrice))) {
-      query['packages.pricePerPlate'] = { $lte: Number(maxPrice) };
+    const query = conditions.length === 1 ? conditions[0] : { $and: conditions };
+    let total;
+    let serviceDocs;
+    if (geoValues) {
+      const [lat, lng, radius] = geoValues;
+      const geoPipeline = [
+        {
+          $geoNear: {
+            near: { type: 'Point', coordinates: [lng, lat] },
+            key: 'location',
+            distanceField: 'distanceMeters',
+            maxDistance: radius * 1000,
+            spherical: true,
+            query
+          }
+        },
+        { $sort: { distanceMeters: 1, _id: 1 } },
+        {
+          $facet: {
+            metadata: [{ $count: 'total' }],
+            data: [{ $skip: skip }, { $limit: limitNum }]
+          }
+        }
+      ];
+      const [result] = await CateringService.aggregate(geoPipeline);
+      total = result?.metadata?.[0]?.total || 0;
+      serviceDocs = (result?.data || []).map((service) => {
+        service.distanceKm = Math.round((service.distanceMeters / 1000) * 100) / 100;
+        delete service.distanceMeters;
+        if (service._id) {
+          service.id = service._id.toString();
+          delete service._id;
+        }
+        service.packages = (service.packages || []).map((pkg) => {
+          if (pkg._id) {
+            pkg.id = pkg._id.toString();
+            delete pkg._id;
+          }
+          return pkg;
+        });
+        return service;
+      });
+    } else {
+      [total, serviceDocs] = await Promise.all([
+        CateringService.countDocuments(query),
+        CateringService.find(query).sort({ createdAt: -1, _id: 1 }).skip(skip).limit(limitNum)
+      ]);
     }
 
-    const total = await CateringService.countDocuments(query);
-    const services = await CateringService.find(query)
-      .populate('vendorId', 'name email phone organization')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum);
-
-    // Clean archived packages
-    const sanitizedServices = services.map((s) => {
-      const obj = s.toObject();
-      obj.packages = (obj.packages || []).filter((p) => !p.isArchived);
-      return obj;
+    const sanitizedServices = serviceDocs.map((service) => {
+      const obj = service.toObject ? service.toObject() : service;
+      obj.packages = getPackageMatches(obj, normalizedFilters).map((pkg) => {
+        if (pkg._id && !pkg.id) pkg.id = pkg._id.toString();
+        return pkg;
+      });
+      return toPublicService(obj, obj.packages, obj.distanceKm);
     });
-
     return res.status(200).json({
       success: true,
       count: sanitizedServices.length,
@@ -214,14 +344,17 @@ const getCateringServiceById = async (req, res, next) => {
 
       const isOwner = service.vendorId === userId || service.vendorId?.id === userId;
       const filteredPackages = (service.packages || []).filter((p) => isOwner || !p.isArchived);
+      const data = { ...service, packages: filteredPackages };
 
       return res.status(200).json({
         success: true,
-        data: { ...service, packages: filteredPackages }
+        data: isOwner || isAdmin
+          ? data
+          : toPublicService(data, filteredPackages)
       });
     }
 
-    const service = await CateringService.findById(id).populate('vendorId', 'name email phone organization');
+    const service = await CateringService.findById(id);
     if (!service || (service.isArchived && !isAdmin)) {
       return res.status(404).json({
         success: false,
@@ -229,13 +362,14 @@ const getCateringServiceById = async (req, res, next) => {
       });
     }
 
-    const isOwner = service.vendorId && (service.vendorId._id ? service.vendorId._id.toString() : service.vendorId.toString()) === userId;
+    const isOwner = service.vendorId && service.vendorId.toString() === userId;
     const obj = service.toObject();
     obj.packages = (obj.packages || []).filter((p) => isOwner || !p.isArchived);
+    const data = isOwner || isAdmin ? obj : toPublicService(obj, obj.packages);
 
     return res.status(200).json({
       success: true,
-      data: obj
+      data
     });
   } catch (error) {
     next(error);
@@ -333,6 +467,12 @@ const createCateringProfile = async (req, res, next) => {
         contactEmail: sanitized.contactEmail || req.user.email,
         contactPhone: sanitized.contactPhone || req.user.phone || '',
         serviceArea: sanitized.serviceArea,
+        city: sanitized.city || '',
+        locality: sanitized.locality || '',
+        fullAddress: sanitized.fullAddress || '',
+        ...(sanitized.location !== undefined && sanitized.location !== null && {
+          location: sanitized.location
+        }),
         cuisineTypes: sanitized.cuisineTypes || [],
         packages: [],
         isAvailable: true,
@@ -552,6 +692,9 @@ const addPackage = async (req, res, next) => {
         description: sanitized.description || '',
         pricePerPlate: sanitized.pricePerPlate,
         minOrder: sanitized.minOrder || 10,
+        ...(sanitized.maxGuests !== undefined && sanitized.maxGuests !== null && {
+          maxGuests: sanitized.maxGuests
+        }),
         menuItems: sanitized.menuItems || [],
         dietaryOptions: sanitized.dietaryOptions || [],
         isArchived: false,
@@ -610,16 +753,6 @@ const updatePackage = async (req, res, next) => {
       });
     }
 
-    const validation = validatePackageInput(req.body, true);
-    if (!validation.isValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Package validation failed.',
-        errors: validation.errors
-      });
-    }
-
-    const { sanitized } = validation;
     const mockStore = getStore(req);
 
     if (mockStore) {
@@ -643,9 +776,18 @@ const updatePackage = async (req, res, next) => {
         });
       }
 
+      const validation = validatePackageInput(req.body, true, service.packages[pkgIndex]);
+      if (!validation.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Package validation failed.',
+          errors: validation.errors
+        });
+      }
+
       service.packages[pkgIndex] = {
         ...service.packages[pkgIndex],
-        ...sanitized,
+        ...validation.sanitized,
         updatedAt: new Date().toISOString()
       };
       mockStore.set(service.id, service);
@@ -673,8 +815,17 @@ const updatePackage = async (req, res, next) => {
       });
     }
 
-    Object.keys(sanitized).forEach((key) => {
-      pkg[key] = sanitized[key];
+    const validation = validatePackageInput(req.body, true, pkg);
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Package validation failed.',
+        errors: validation.errors
+      });
+    }
+
+    Object.keys(validation.sanitized).forEach((key) => {
+      pkg[key] = validation.sanitized[key];
     });
 
     await service.save();

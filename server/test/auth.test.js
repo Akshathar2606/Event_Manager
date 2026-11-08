@@ -122,7 +122,7 @@ describe('EventFlow Authentication & RBAC Test Suite', () => {
       assert.equal(resNoNumPass.statusCode, 400);
     });
 
-    test('5. Self-registration as administrator or vendor is strictly rejected with 403 Forbidden', async () => {
+    test('5. Administrator self-registration is forbidden and vendor registration requires application details', async () => {
       // Administrator attempt
       const adminRes = await request(app, {
         method: 'POST',
@@ -135,9 +135,9 @@ describe('EventFlow Authentication & RBAC Test Suite', () => {
         }
       });
       assert.equal(adminRes.statusCode, 403);
-      assert.match(adminRes.body.message, /Self-registration as 'administrator' is strictly forbidden/i);
+      assert.match(adminRes.body.message, /Self-registration as an administrator is strictly forbidden/i);
 
-      // Vendor attempt
+      // Vendor submissions must include validated business information.
       const vendorRes = await request(app, {
         method: 'POST',
         url: '/api/auth/register',
@@ -148,8 +148,8 @@ describe('EventFlow Authentication & RBAC Test Suite', () => {
           role: 'vendor'
         }
       });
-      assert.equal(vendorRes.statusCode, 403);
-      assert.match(vendorRes.body.message, /Self-registration as 'vendor' is strictly forbidden/i);
+      assert.equal(vendorRes.statusCode, 400);
+      assert.match(vendorRes.body.errors.join(' '), /Business name is required/i);
     });
   });
 
@@ -271,6 +271,106 @@ describe('EventFlow Authentication & RBAC Test Suite', () => {
       assert.equal(res.body.success, true);
       assert.equal(res.body.user.email, 'token.user@example.com');
       assert.equal(res.body.user.role, 'participant');
+    });
+
+    test('9a. Authenticated users can update only their own allowed profile fields', async () => {
+      const storedUser = app.locals.mockUserStore.get(registeredUser.id);
+      storedUser.passwordResetTokenHash = 'sensitive-reset-token-hash';
+      storedUser.passwordResetExpires = new Date(Date.now() + 60_000);
+      const res = await request(app, {
+        method: 'PATCH',
+        url: '/api/auth/me',
+        headers: { authorization: `Bearer ${validToken}` },
+        body: {
+          firstName: 'Taylor',
+          lastName: 'Morgan',
+          phone: '+1 555 123 4567',
+          organization: 'Design Society',
+          location: 'Tumakuru',
+          bio: 'Event volunteer.',
+          interests: ['Design', 'Community'],
+          socialLinks: [{ label: 'Portfolio', url: 'https://example.com/taylor' }]
+        }
+      });
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.body.user.name, 'Taylor Morgan');
+      assert.equal(res.body.user.firstName, 'Taylor');
+      assert.equal(res.body.user.lastName, 'Morgan');
+      assert.equal(res.body.user.role, 'participant');
+      assert.equal(res.body.user.email, 'token.user@example.com');
+      assert.deepEqual(res.body.user.interests, ['Design', 'Community']);
+      assert.deepEqual(res.body.user.socialLinks, [
+        { label: 'Portfolio', url: 'https://example.com/taylor' }
+      ]);
+      assert.equal(res.body.user.passwordHash, undefined);
+      assert.equal(res.body.user.passwordResetTokenHash, undefined);
+      assert.equal(res.body.user.passwordResetExpires, undefined);
+      assert.equal(app.locals.mockUserStore.get(registeredUser.id).name, 'Taylor Morgan');
+    });
+
+    test('9b. Profile updates require authentication and cannot change role, email, or another user', async () => {
+      const unauthorized = await request(app, {
+        method: 'PATCH',
+        url: '/api/auth/me',
+        body: { firstName: 'Taylor', lastName: 'Morgan' }
+      });
+      assert.equal(unauthorized.statusCode, 401);
+
+      const roleChange = await request(app, {
+        method: 'PATCH',
+        url: '/api/auth/me',
+        headers: { authorization: `Bearer ${validToken}` },
+        body: {
+          firstName: 'Taylor',
+          lastName: 'Morgan',
+          role: 'administrator'
+        }
+      });
+      assert.equal(roleChange.statusCode, 400);
+      assert.equal(app.locals.mockUserStore.get(registeredUser.id).role, 'participant');
+
+      const emailChange = await request(app, {
+        method: 'PATCH',
+        url: '/api/auth/me',
+        headers: { authorization: `Bearer ${validToken}` },
+        body: {
+          firstName: 'Taylor',
+          lastName: 'Morgan',
+          email: 'new-address@example.com'
+        }
+      });
+      assert.equal(emailChange.statusCode, 400);
+      assert.equal(app.locals.mockUserStore.get(registeredUser.id).email, 'token.user@example.com');
+
+      const anotherUser = await request(app, {
+        method: 'PATCH',
+        url: `/api/auth/me/${registeredUser.id}`,
+        headers: { authorization: `Bearer ${validToken}` },
+        body: { firstName: 'Taylor', lastName: 'Morgan' }
+      });
+      assert.equal(anotherUser.statusCode, 404);
+    });
+
+    test('9c. Profile updates validate fields and social URLs on the backend', async () => {
+      const res = await request(app, {
+        method: 'PATCH',
+        url: '/api/auth/me',
+        headers: { authorization: `Bearer ${validToken}` },
+        body: {
+          firstName: 'Taylor',
+          lastName: 'Morgan',
+          phone: '12',
+          bio: 'x'.repeat(501),
+          interests: ['Design', 'design'],
+          socialLinks: [{ label: 'Unsafe', url: 'javascript:alert(1)' }]
+        }
+      });
+
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.body.success, false);
+      assert.ok(res.body.errors.length >= 4);
+      assert.equal(app.locals.mockUserStore.get(registeredUser.id).name, 'Token User');
     });
   });
 

@@ -118,11 +118,47 @@ The recovery endpoints allow five requests per client IP and endpoint per 15-min
 
 After copying `server/.env.example`, replace every placeholder, including the SMTP settings and `CLIENT_BASE_URL`. Set the frontend's `client/.env` `VITE_API_URL` to the backend API URL as needed; this setting is separate from the backend's trusted reset-link base URL.
 
+### Catering Discovery Filters
+
+`GET /api/catering` keeps its existing paginated response and accepts `search`, `city`, `locality`, `cuisine`, `dietary`, `maxPrice`, `guestCount`, `latitude`, `longitude`, `radiusKm`, `page`, and `limit`. City and locality match case-insensitively; cuisine and dietary values may be comma-separated. Price, dietary, and capacity criteria are evaluated against the same active package, and archived packages do not qualify. Distance filtering is enabled only when valid latitude, longitude, and a positive radius are all supplied; distance is returned in `distanceKm`. City and locality searches continue to include legacy profiles without coordinates.
+
+Vendor profiles may optionally include `city`, `locality`, `fullAddress`, and `location: { type: "Point", coordinates: [longitude, latitude] }`. Package `maxGuests` is optional and must be an integer no lower than `minOrder`; packages without it remain uncapped.
+
+The catering model declares the `location` 2dsphere index. If a deployment disables Mongoose automatic index creation, provision that index before enabling radius searches; this requires no data migration or record changes.
+
+### Fictional Catering Demo Listings
+
+The optional demo seed creates up to three clearly labelled fictional Tumakuru catering profiles with illustrative prices and menus. It never creates vendor accounts and never overwrites an existing catering profile. Before running it, select one to three existing vendor account ObjectIds that are approved for demo use; the operation skips any selected account that already has a catering profile. No credentials or contact details are added to the demo listings.
+
+Run from the repository root after configuring the server's MongoDB connection:
+
+```powershell
+node .\server\scripts\seed-catering-demos.js <existing-vendor-object-id> [<existing-vendor-object-id> ...]
+```
+
+The demo coordinates and locality labels are illustrative, not business addresses. Do not assign a demo profile to a real vendor account without that account owner's consent.
+
 ### Event Benefits and Eligible Years
 
 Organizers can set AICTE point and attendance availability independently while creating or editing an event. Each is stored as a Boolean (`aictePointsAvailable` and `attendanceProvided`). Organizers can also choose one or more eligible student years from First through Fourth Year; the server stores only the fixed enum values (`first`, `second`, `third`, `fourth`) in `eligibleYears`. The “All Years” checkbox selects the complete set and reflects whether all four individual options are selected.
 
 For compatibility, omitted availability fields default to `false` and omitted eligible years default to all four years. Existing MongoDB events are not migrated or rewritten; schema defaults and the frontend's legacy-data fallback provide these values when needed. The participant event cards and event details, as well as organizer event cards, display the benefits and eligibility.
+
+### Event Lifecycle
+
+The stored event status remains `draft`, `published`, or `cancelled`; API event reads also include a derived `lifecycleStatus` of `draft`, `upcoming`, `ongoing`, `completed`, or `cancelled`. Published event status is calculated from `startDateTime` and `endDateTime` on each API read and filter, so no scheduler or database migration is needed. Date values are compared as UTC instants; the event schema does not currently store a separate timezone.
+
+Draft and cancelled events keep their stored state. If an event has no end timestamp, its lifecycle end is inferred as 24 hours after its start. An explicit end time is still required before publishing because venue approval must cover the booked event interval. A MongoDB-backed scheduler records completion activity after published events end without changing stored registration or booking history. Completed event schedules are read-only, while event, registration, venue, booking, and attendee history remains available.
+
+### Notifications and Event Activity
+
+Authenticated users can view their own paginated notifications at `GET /api/notifications`, check their unread count at `/api/notifications/unread-count`, and mark one or all notifications as read. Notification recipients are derived from persisted event, booking, catering, registration, and vendor-application relationships; clients cannot choose recipients. The AppLayout notification panel refreshes its unread count once per minute.
+
+The backend records event creation, publication, important updates, cancellation, registration, venue booking, catering request, and completion activity. Activity history is available to the event's organizer and administrators at `GET /api/events/:id/activity`; it is not exposed to unrelated participants. Notifications and activity records use action-specific deduplication keys. Delivery failures are logged and do not roll back or change the response for a completed business action.
+
+The persistent reminder scheduler stores reminder jobs in MongoDB, initializes their indexes before the HTTP server starts, and uses atomic leases, bounded retries (up to five attempts), and deduplication keys to coordinate workers and survive restarts. It runs once per minute outside automated test environments. Organizers are reminded 7 days and 24 hours before an event; active registered participants are reminded 24 hours and 1 hour before it. Pending venue bookings and unanswered catering requests are reminded every 24 hours after the initial 24-hour wait, while pending vendor applications are reminded every 48 hours after their initial 48-hour wait. Resolved or ineligible requests are cancelled, and reminders that are too late are not delivered. Recipients are looked up from current database relationships when a reminder is delivered.
+
+Event completion remains a derived lifecycle state rather than a stored event status. The scheduler records a deduplicated completion activity after the scheduled end time; no write is triggered by an ordinary GET request. Notifications are polled by the client and are not real-time. Automated scheduling and event completion have mock-store test coverage; production persistence, cross-process atomic claims, and timing should also be verified against a staging MongoDB deployment.
 
 ### Tests
 

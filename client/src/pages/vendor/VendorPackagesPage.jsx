@@ -32,6 +32,7 @@ export default function VendorPackagesPage() {
     description: '',
     pricePerPlate: '',
     minOrder: '10',
+    maxGuests: '',
     menuItemsText: '',
     dietaryOptions: []
   });
@@ -78,6 +79,7 @@ export default function VendorPackagesPage() {
       description: '',
       pricePerPlate: '',
       minOrder: '10',
+      maxGuests: '',
       menuItemsText: '',
       dietaryOptions: []
     });
@@ -93,6 +95,7 @@ export default function VendorPackagesPage() {
       description: pkg.description || '',
       pricePerPlate: String(pkg.pricePerPlate ?? ''),
       minOrder: String(pkg.minOrder ?? 10),
+      maxGuests: pkg.maxGuests == null ? '' : String(pkg.maxGuests),
       menuItemsText: (pkg.menuItems || []).join('\n'),
       dietaryOptions: pkg.dietaryOptions || []
     });
@@ -125,6 +128,14 @@ export default function VendorPackagesPage() {
     if (formData.minOrder === '' || isNaN(minOrder) || !Number.isInteger(minOrder) || minOrder < 1) {
       errors.minOrder = 'Minimum order size must be at least 1 person.';
     }
+    if (formData.maxGuests !== '') {
+      const maxGuests = Number(formData.maxGuests);
+      if (!Number.isInteger(maxGuests) || maxGuests < 1) {
+        errors.maxGuests = 'Maximum guest capacity must be a whole number of at least 1 person.';
+      } else if (maxGuests < minOrder) {
+        errors.maxGuests = 'Maximum capacity must be greater than or equal to the minimum order.';
+      }
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -146,6 +157,7 @@ export default function VendorPackagesPage() {
         description: formData.description.trim(),
         pricePerPlate: Number(formData.pricePerPlate),
         minOrder: Number(formData.minOrder),
+        maxGuests: formData.maxGuests === '' ? null : Number(formData.maxGuests),
         menuItems,
         dietaryOptions: formData.dietaryOptions
       };
@@ -186,7 +198,7 @@ export default function VendorPackagesPage() {
 
   if (loading) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center text-slate-400">
+      <div className="py-20 flex flex-col items-center justify-center text-text-muted">
         <Loader2 className="w-8 h-8 animate-spin text-amber-600 mb-2" />
         <p className="text-sm font-medium">Loading catering packages...</p>
       </div>
@@ -196,7 +208,7 @@ export default function VendorPackagesPage() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+      <div className="bg-surface rounded-2xl border border-border p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -205,10 +217,10 @@ export default function VendorPackagesPage() {
                 Menu & Food Packages
               </span>
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-extrabold text-text-primary tracking-tight">
               Catering Packages & Menus
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-text-muted">
               Create buffet and plated package options with detailed dietary classifications and pricing
             </p>
           </div>
@@ -246,12 +258,12 @@ export default function VendorPackagesPage() {
 
       {/* Packages Grid */}
       {packages.length === 0 ? (
-        <div className="py-20 px-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs text-center">
+        <div className="py-20 px-4 bg-surface rounded-2xl border border-border shadow-xs text-center">
           <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-3">
             <UtensilsCrossed className="w-6 h-6" />
           </div>
-          <h3 className="font-semibold text-slate-800 text-base">No food packages created yet</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          <h3 className="font-semibold text-text-primary text-base">No food packages created yet</h3>
+          <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
             Create your first package with per-plate pricing, menu items, and dietary tags so campus organizers can book you.
           </p>
           <button
@@ -270,27 +282,33 @@ export default function VendorPackagesPage() {
             return (
               <div
                 key={pkgId}
-                className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                className="bg-surface rounded-2xl border border-border p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
               >
                 <div>
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <h3 className="font-bold text-slate-900 text-lg leading-snug">{pkg.name}</h3>
+                    <h3 className="font-bold text-text-primary text-lg leading-snug">{pkg.name}</h3>
                     <span className="font-extrabold text-amber-700 text-base shrink-0">
                       ${pkg.pricePerPlate}
-                      <span className="text-[10px] text-slate-400 font-normal"> /plate</span>
+                      <span className="text-[10px] text-text-muted font-normal"> /plate</span>
                     </span>
                   </div>
 
                   {/* Description */}
                   {pkg.description && (
-                    <p className="text-xs text-slate-600 leading-relaxed mb-3">{pkg.description}</p>
+                    <p className="text-xs text-text-secondary leading-relaxed mb-3">{pkg.description}</p>
                   )}
 
                   {/* Specs */}
-                  <div className="py-2 px-3 bg-slate-50 rounded-xl mb-3 text-xs flex items-center justify-between text-slate-600">
-                    <span className="text-slate-400 text-[11px]">Min. Order Requirement</span>
-                    <span className="font-semibold text-slate-800">{pkg.minOrder} Attendees</span>
+                  <div className="py-2 px-3 bg-background rounded-xl mb-3 text-xs flex items-center justify-between text-text-secondary">
+                    <span className="text-text-muted text-[11px]">Min. Order Requirement</span>
+                    <span className="font-semibold text-text-primary">{pkg.minOrder} Attendees</span>
+                  </div>
+                  <div className="py-2 px-3 bg-background rounded-xl mb-3 text-xs flex items-center justify-between text-text-secondary">
+                    <span className="text-text-muted text-[11px]">Maximum Capacity</span>
+                    <span className="font-semibold text-text-primary">
+                      {pkg.maxGuests == null ? 'No stated maximum' : `${pkg.maxGuests} Attendees`}
+                    </span>
                   </div>
 
                   {/* Dietary Badges */}
@@ -312,17 +330,17 @@ export default function VendorPackagesPage() {
                   {/* Menu Items */}
                   {(pkg.menuItems || []).length > 0 && (
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                      <span className="text-[10px] uppercase font-bold text-text-muted block mb-1">
                         Menu Items ({(pkg.menuItems || []).length})
                       </span>
-                      <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
+                      <ul className="text-xs text-text-secondary space-y-1 list-disc list-inside">
                         {pkg.menuItems.slice(0, 4).map((item, idx) => (
                           <li key={idx} className="truncate">
                             {item}
                           </li>
                         ))}
                         {pkg.menuItems.length > 4 && (
-                          <li className="text-[11px] text-slate-400 italic list-none">
+                          <li className="text-[11px] text-text-muted italic list-none">
                             +{pkg.menuItems.length - 4} additional items
                           </li>
                         )}
@@ -332,11 +350,11 @@ export default function VendorPackagesPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                <div className="pt-4 mt-4 border-t border-border flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => openEditModal(pkg)}
-                    className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                    className="p-1.5 text-text-muted hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                     title="Edit Package"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -344,7 +362,7 @@ export default function VendorPackagesPage() {
                   <button
                     type="button"
                     onClick={() => setArchiveTarget(pkg)}
-                    className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                    className="p-1.5 text-text-muted hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                     title="Archive Package"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -358,16 +376,16 @@ export default function VendorPackagesPage() {
 
       {/* Add / Edit Package Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-6 sm:p-8 animate-fadeIn">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <h3 className="font-bold text-lg text-slate-900">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-lg w-full p-6 sm:p-8 animate-fadeIn">
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <h3 className="font-bold text-lg text-text-primary">
                 {modalMode === 'create' ? 'Add Catering Food Package' : `Edit "${activePackage?.name}"`}
               </h3>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-text-muted hover:text-text-secondary p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -376,7 +394,7 @@ export default function VendorPackagesPage() {
             <form onSubmit={handleFormSubmit} className="mt-5 space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
                   Package Name *
                 </label>
                 <input
@@ -384,8 +402,8 @@ export default function VendorPackagesPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Executive Luncheon or Continental Breakfast"
-                  className={`block w-full px-3 py-2 text-sm rounded-xl border bg-white ${
-                    formErrors.name ? 'border-rose-400 focus:ring-rose-200' : 'border-slate-200 focus:ring-amber-100'
+                  className={`block w-full px-3 py-2 text-sm rounded-xl border bg-surface ${
+                    formErrors.name ? 'border-rose-400 focus:ring-rose-200' : 'border-border focus:ring-amber-100'
                   } focus:outline-hidden focus:ring-2 focus:border-amber-600`}
                 />
                 {formErrors.name && (
@@ -394,9 +412,9 @@ export default function VendorPackagesPage() {
               </div>
 
               {/* Price & Min Order in Two Columns */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
                     Price per Plate ($) *
                   </label>
                   <input
@@ -406,10 +424,10 @@ export default function VendorPackagesPage() {
                     value={formData.pricePerPlate}
                     onChange={(e) => setFormData({ ...formData, pricePerPlate: e.target.value })}
                     placeholder="e.g. 25.00"
-                    className={`block w-full px-3 py-2 text-sm rounded-xl border bg-white ${
+                    className={`block w-full px-3 py-2 text-sm rounded-xl border bg-surface ${
                       formErrors.pricePerPlate
                         ? 'border-rose-400 focus:ring-rose-200'
-                        : 'border-slate-200 focus:ring-amber-100'
+                        : 'border-border focus:ring-amber-100'
                     } focus:outline-hidden focus:ring-2 focus:border-amber-600`}
                   />
                   {formErrors.pricePerPlate && (
@@ -418,7 +436,7 @@ export default function VendorPackagesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
                     Min. Order Size (people) *
                   </label>
                   <input
@@ -427,35 +445,56 @@ export default function VendorPackagesPage() {
                     value={formData.minOrder}
                     onChange={(e) => setFormData({ ...formData, minOrder: e.target.value })}
                     placeholder="10"
-                    className={`block w-full px-3 py-2 text-sm rounded-xl border bg-white ${
+                    className={`block w-full px-3 py-2 text-sm rounded-xl border bg-surface ${
                       formErrors.minOrder
                         ? 'border-rose-400 focus:ring-rose-200'
-                        : 'border-slate-200 focus:ring-amber-100'
+                        : 'border-border focus:ring-amber-100'
                     } focus:outline-hidden focus:ring-2 focus:border-amber-600`}
                   />
                   {formErrors.minOrder && (
                     <p className="mt-1 text-xs text-rose-600 font-medium">{formErrors.minOrder}</p>
                   )}
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                    Max. Guests <span className="text-text-muted font-normal lowercase">(optional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={formData.minOrder || '1'}
+                    step="1"
+                    value={formData.maxGuests}
+                    onChange={(e) => setFormData({ ...formData, maxGuests: e.target.value })}
+                    placeholder="No limit"
+                    className={`block w-full px-3 py-2 text-sm rounded-xl border bg-surface ${
+                      formErrors.maxGuests
+                        ? 'border-rose-400 focus:ring-rose-200'
+                        : 'border-border focus:ring-amber-100'
+                    } focus:outline-hidden focus:ring-2 focus:border-amber-600`}
+                  />
+                  {formErrors.maxGuests && (
+                    <p className="mt-1 text-xs text-rose-600 font-medium">{formErrors.maxGuests}</p>
+                  )}
+                </div>
               </div>
 
               {/* Description */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Description <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                  Description <span className="text-text-muted font-normal lowercase">(optional)</span>
                 </label>
                 <textarea
                   rows="2"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Overview of the courses, presentation style (buffet/plated), etc."
-                  className="block w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+                  className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
                 />
               </div>
 
               {/* Dietary Options Chips */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
                   Dietary Classifications
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -469,7 +508,7 @@ export default function VendorPackagesPage() {
                         className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
                           isSelected
                             ? 'bg-emerald-600 text-white border-emerald-600'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            : 'bg-background text-text-secondary border-border hover:bg-surface-subtle'
                         }`}
                       >
                         {isSelected ? '✓ ' : '+ '}
@@ -482,24 +521,24 @@ export default function VendorPackagesPage() {
 
               {/* Menu Items (Multiline text) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Menu Items <span className="text-slate-400 font-normal lowercase">(one item per line)</span>
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                  Menu Items <span className="text-text-muted font-normal lowercase">(one item per line)</span>
                 </label>
                 <textarea
                   rows="4"
                   value={formData.menuItemsText}
                   onChange={(e) => setFormData({ ...formData, menuItemsText: e.target.value })}
                   placeholder="Garden Spring Salad&#10;Herb Roasted Chicken Breast&#10;Rosemary Garlic Potatoes&#10;Assorted Pastries"
-                  className="block w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white font-mono text-xs focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+                  className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface font-mono text-xs focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
                 />
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+              <div className="pt-4 border-t border-border flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  className="px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface-subtle rounded-xl"
                 >
                   Cancel
                 </button>
@@ -519,17 +558,17 @@ export default function VendorPackagesPage() {
 
       {/* Archive Confirmation Modal */}
       {archiveTarget && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 text-center animate-fadeIn">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-md w-full p-6 text-center animate-fadeIn">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto mb-3">
               <AlertTriangle className="w-6 h-6" />
             </div>
 
-            <h3 className="font-bold text-lg text-slate-900">Archive Food Package?</h3>
-            <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-              Are you sure you want to archive <span className="font-semibold text-slate-800">"{archiveTarget.name}"</span>?
+            <h3 className="font-bold text-lg text-text-primary">Archive Food Package?</h3>
+            <p className="text-xs text-text-muted mt-2 leading-relaxed">
+              Are you sure you want to archive <span className="font-semibold text-text-primary">"{archiveTarget.name}"</span>?
               <br />
-              <span className="text-slate-400">
+              <span className="text-text-muted">
                 Existing booking records will remain intact, but organizers will no longer see this package for new events.
               </span>
             </p>
@@ -538,7 +577,7 @@ export default function VendorPackagesPage() {
               <button
                 type="button"
                 onClick={() => setArchiveTarget(null)}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface-subtle rounded-xl"
               >
                 Cancel
               </button>

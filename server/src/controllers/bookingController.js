@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const { Booking, BOOKING_STATUS } = require('../models/Booking');
 const { Event } = require('../models/Event');
 const { Venue } = require('../models/Venue');
+const {
+  deliverNotification,
+  notifyAdministrators,
+  recordEventActivity
+} = require('../services/workflowService');
 const { User } = require('../models/User');
 const {
   isValidObjectId,
@@ -275,6 +280,23 @@ const createBooking = async (req, res, next) => {
       };
 
       mockStore.set(newId, newBooking);
+      await recordEventActivity(req, {
+        eventId: sanitized.event,
+        actorId: req.user.id,
+        action: 'venue_booking_requested',
+        description: `A venue booking was requested for "${event.title}".`,
+        metadata: { bookingId: newId },
+        dedupeKey: `booking-requested:${newId}`
+      });
+      await notifyAdministrators(req, {
+        actorId: req.user.id,
+        type: 'booking_requested',
+        title: 'New venue booking request',
+        message: `A venue booking was requested for "${event.title}".`,
+        entityType: 'booking',
+        entityId: newId,
+        dedupeKey: `booking-requested:${newId}`
+      });
 
       return res.status(201).json({
         success: true,
@@ -300,6 +322,23 @@ const createBooking = async (req, res, next) => {
     await booking.populate('event', 'title startDateTime endDateTime capacity status category');
     await booking.populate('venue', 'name location capacity facilities hourlyRate status');
     await booking.populate('organizer', 'name email organization phone');
+    await recordEventActivity(req, {
+      eventId: sanitized.event,
+      actorId: req.user.id,
+      action: 'venue_booking_requested',
+      description: `A venue booking was requested for "${event.title}".`,
+      metadata: { bookingId: booking._id },
+      dedupeKey: `booking-requested:${booking._id}`
+    });
+    await notifyAdministrators(req, {
+      actorId: req.user.id,
+      type: 'booking_requested',
+      title: 'New venue booking request',
+      message: `A venue booking was requested for "${event.title}".`,
+      entityType: 'booking',
+      entityId: booking._id,
+      dedupeKey: `booking-requested:${booking._id}`
+    });
 
     return res.status(201).json({
       success: true,
@@ -694,6 +733,24 @@ const approveBooking = async (req, res, next) => {
         event.venue = venueId;
         eventStore.set(eventId, event);
       }
+      await recordEventActivity(req, {
+        eventId,
+        actorId: req.user.id,
+        action: 'venue_booking_approved',
+        description: `The venue booking for "${event.title}" was approved.`,
+        metadata: { bookingId: id, status: 'approved' },
+        dedupeKey: `booking-approved:${id}`
+      });
+      await deliverNotification(req, {
+        recipientId: getReferenceId(booking.organizer),
+        actorId: req.user.id,
+        type: 'booking_approved',
+        title: 'Venue booking approved',
+        message: `The venue booking for "${event.title}" was approved.`,
+        entityType: 'booking',
+        entityId: id,
+        dedupeKey: `booking-approved:${id}`
+      });
 
       return res.status(200).json({
         success: true,
@@ -822,6 +879,24 @@ const approveBooking = async (req, res, next) => {
     await booking.populate('venue', 'name location capacity facilities hourlyRate status');
     await booking.populate('organizer', 'name email organization phone');
     await booking.populate('reviewedBy', 'name email role');
+    await recordEventActivity(req, {
+      eventId,
+      actorId: req.user.id,
+      action: 'venue_booking_approved',
+      description: `The venue booking for "${event.title}" was approved.`,
+      metadata: { bookingId: booking._id, status: 'approved' },
+      dedupeKey: `booking-approved:${id}`
+    });
+    await deliverNotification(req, {
+      recipientId: getReferenceId(booking.organizer),
+      actorId: req.user.id,
+      type: 'booking_approved',
+      title: 'Venue booking approved',
+      message: `The venue booking for "${event.title}" was approved.`,
+      entityType: 'booking',
+      entityId: booking._id,
+      dedupeKey: `booking-approved:${id}`
+    });
 
     return res.status(200).json({
       success: true,
@@ -882,6 +957,27 @@ const rejectBooking = async (req, res, next) => {
       booking.rejectionReason = reason;
       booking.updatedAt = new Date();
       mockStore.set(id, booking);
+      const eventStore = getEventStore(req);
+      const event = eventStore?.get(getReferenceId(booking.event));
+      const eventTitle = event?.title || 'Event';
+      await recordEventActivity(req, {
+        eventId: getReferenceId(booking.event),
+        actorId: req.user.id,
+        action: 'venue_booking_rejected',
+        description: `The venue booking for "${eventTitle}" was rejected.`,
+        metadata: { bookingId: id, status: 'rejected' },
+        dedupeKey: `booking-rejected:${id}`
+      });
+      await deliverNotification(req, {
+        recipientId: getReferenceId(booking.organizer),
+        actorId: req.user.id,
+        type: 'booking_rejected',
+        title: 'Venue booking rejected',
+        message: `The venue booking for "${eventTitle}" was rejected.`,
+        entityType: 'booking',
+        entityId: id,
+        dedupeKey: `booking-rejected:${id}`
+      });
 
       return res.status(200).json({
         success: true,
@@ -900,6 +996,25 @@ const rejectBooking = async (req, res, next) => {
     await booking.populate('venue', 'name location capacity facilities hourlyRate status');
     await booking.populate('organizer', 'name email organization phone');
     await booking.populate('reviewedBy', 'name email role');
+    const eventTitle = booking.event?.title || 'Event';
+    await recordEventActivity(req, {
+      eventId: getReferenceId(booking.event),
+      actorId: req.user.id,
+      action: 'venue_booking_rejected',
+      description: `The venue booking for "${eventTitle}" was rejected.`,
+      metadata: { bookingId: booking._id, status: 'rejected' },
+      dedupeKey: `booking-rejected:${id}`
+    });
+    await deliverNotification(req, {
+      recipientId: getReferenceId(booking.organizer),
+      actorId: req.user.id,
+      type: 'booking_rejected',
+      title: 'Venue booking rejected',
+      message: `The venue booking for "${eventTitle}" was rejected.`,
+      entityType: 'booking',
+      entityId: booking._id,
+      dedupeKey: `booking-rejected:${id}`
+    });
 
     return res.status(200).json({
       success: true,

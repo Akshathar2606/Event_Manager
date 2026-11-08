@@ -1,437 +1,767 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { registrationService } from '../../services/registrationService';
-import { eventService } from '../../services/eventService';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import {
-  getRegistrationStatusBadge,
-  formatAcademicYear,
-  formatDisplayDate,
-  formatDisplayTime
-} from '../../utils/registrationUtils';
-import { extractErrorMessage } from '../../services/authService';
-import {
-  Users,
-  Calendar,
-  Clock,
-  MapPin,
+  ArrowDown,
   ArrowLeft,
-  Mail,
-  Phone,
-  Building2,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Loader2,
-  ShieldAlert,
-  ChevronLeft,
-  ChevronRight,
+  ArrowUp,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  Clock3,
+  Download,
+  Eye,
+  FileSpreadsheet,
+  FileText,
   Filter,
-  Ticket,
-  UserCheck,
-  UserX
+  Loader2,
+  Mail,
+  MapPin,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Users,
+  X
 } from 'lucide-react';
+import { registrationService } from '../../services/registrationService';
+import { eventService, extractErrorMessage } from '../../services/eventService';
+import { formatAcademicYear } from '../../utils/registrationUtils';
+import {
+  downloadAttendeeCsv,
+  downloadAttendeeExcel,
+  downloadAttendeePdf,
+  fetchAllAttendeePages,
+  selectAttendeesForExport
+} from '../../utils/attendeeExport';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  Input,
+  LoadingState,
+  Pagination,
+  Select
+} from '../../components/ui';
+
+const PAGE_SIZE = 25;
+const MAX_BULK_SIZE = 100;
+const ATTENDANCE_OPTIONS = [
+  { value: 'not_marked', label: 'Not marked' },
+  { value: 'present', label: 'Present' },
+  { value: 'absent', label: 'Absent' }
+];
+
+const columns = [
+  { id: 'registrationId', label: 'Registration ID' },
+  { id: 'name', label: 'Participant' },
+  { id: 'email', label: 'Email' },
+  { id: 'phone', label: 'Phone' },
+  { id: 'organization', label: 'Department / organization' },
+  { id: 'academicYear', label: 'Year' },
+  { id: 'registeredAt', label: 'Registered' },
+  { id: 'status', label: 'Registration status' },
+  { id: 'attendanceStatus', label: 'Attendance' },
+  { id: 'actions', label: 'Actions' }
+];
+
+const getRegistrationId = (registration) => String(registration.id || registration._id || '');
+
+const formatDate = (value, includeTime = false) => {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    ...(includeTime ? { timeStyle: 'short' } : {})
+  }).format(date);
+};
+
+const lifecycleLabel = (event) => event?.lifecycleStatus || event?.status || 'Unknown';
+
+const registrationStatusVariant = (status) => status === 'registered' ? 'success' : 'neutral';
+
+const attendanceVariant = (status) => {
+  if (status === 'present') return 'success';
+  if (status === 'absent') return 'error';
+  return 'neutral';
+};
+
+const getExportFilename = (event, format) => {
+  const slug = String(event?.title || 'Event')
+    .replace(/[^a-zA-Z0-9]+/g, '') || 'Event';
+  return `EventFlow_${slug}_Attendees.${format}`;
+};
 
 export default function OrganizerEventAttendeesPage() {
   const { id: eventId } = useParams();
-  const navigate = useNavigate();
-
   const [event, setEvent] = useState(null);
   const [attendees, setAttendees] = useState([]);
-  const [summary, setSummary] = useState({ totalAll: 0, activeCount: 0, cancelledCount: 0 });
-  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, pages: 1 });
-
+  const [summary, setSummary] = useState({
+    totalAll: 0,
+    activeCount: 0,
+    cancelledCount: 0,
+    presentCount: 0,
+    absentCount: 0,
+    notMarkedCount: 0
+  });
+  const [pagination, setPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, pages: 1 });
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    attendanceStatus: '',
+    department: '',
+    dateFrom: '',
+    dateTo: ''
+  });
+  const [sort, setSort] = useState({ sortBy: 'registeredAt', sortOrder: 'desc' });
+  const [page, setPage] = useState(1);
+  const [visibleColumns, setVisibleColumns] = useState(columns.map((column) => column.id));
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkAttendanceStatus, setBulkAttendanceStatus] = useState('');
+  const [selectedRegistration, setSelectedRegistration] = useState(null);
   const [loading, setLoading] = useState(true);
   const [eventLoading, setEventLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isForbidden, setIsForbidden] = useState(false);
+  const [savingAttendance, setSavingAttendance] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState('');
+  const exporting = Boolean(exportingFormat);
+  const [error, setError] = useState('');
+  const [eventError, setEventError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef(null);
+  const exportingRef = useRef(false);
 
-  // Status Filter: 'all', 'registered', 'cancelled'
-  const [statusFilter, setStatusFilter] = useState('all');
+  const queryFilters = useMemo(() => ({
+    ...filters,
+    ...sort
+  }), [filters, sort]);
 
-  // Load Event Metadata
-  const fetchEventDetails = useCallback(async () => {
+  const closeExportMenu = useCallback((restoreFocus = false) => {
+    const menu = exportMenuRef.current;
+    if (!menu?.open) return;
+    menu.open = false;
+    setExportMenuOpen(false);
+    if (restoreFocus) menu.querySelector('summary')?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!exportMenuOpen) return undefined;
+
+    const handleOutsidePointerDown = (event) => {
+      if (!exportMenuRef.current?.contains(event.target)) closeExportMenu();
+    };
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeExportMenu(true);
+      }
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [closeExportMenu, exportMenuOpen]);
+
+  const fetchEvent = useCallback(async () => {
     setEventLoading(true);
+    setEventError('');
     try {
-      const res = await eventService.getEventById(eventId);
-      setEvent(res.data);
-    } catch (err) {
-      console.warn('Could not load event metadata:', err);
+      const result = await eventService.getEventById(eventId);
+      setEvent(result);
+    } catch (requestError) {
+      setEventError(extractErrorMessage(requestError, 'Event details could not be loaded.'));
     } finally {
       setEventLoading(false);
     }
   }, [eventId]);
 
-  // Load Attendee Roster
-  const fetchAttendees = useCallback(async (targetPage = 1) => {
+  const fetchAttendees = useCallback(async (targetPage = page) => {
     setLoading(true);
-    setError(null);
-    setIsForbidden(false);
-
+    setError('');
     try {
-      const params = {
+      const result = await registrationService.getEventAttendees(eventId, {
+        ...queryFilters,
         page: targetPage,
-        limit: 15
-      };
-      if (statusFilter !== 'all') {
-        params.status = statusFilter;
-      }
-
-      const res = await registrationService.getEventAttendees(eventId, params);
-      setAttendees(res.data || []);
-      if (res.summary) {
-        setSummary(res.summary);
-      }
-      if (res.pagination) {
-        setPagination(res.pagination);
-      } else {
-        setPagination({
-          page: targetPage,
-          limit: 15,
-          total: res.count || (res.data ? res.data.length : 0),
-          pages: Math.max(1, Math.ceil((res.count || 1) / 15))
-        });
-      }
-    } catch (err) {
-      const status = err.response?.status;
-      if (status === 403) {
-        setIsForbidden(true);
-        setError('Access Denied: You can only view attendee rosters for events you organized.');
-      } else {
-        setError(extractErrorMessage(err, 'Failed to retrieve attendee roster for this event.'));
+        limit: PAGE_SIZE
+      });
+      setAttendees(result.data || []);
+      setSummary((current) => ({ ...current, ...(result.summary || {}) }));
+      setPagination(result.pagination || {
+        page: targetPage,
+        limit: PAGE_SIZE,
+        total: result.count || 0,
+        pages: 1
+      });
+    } catch (requestError) {
+      const message = extractErrorMessage(requestError, 'Attendee records could not be loaded.');
+      setError(message);
+      if (requestError.response?.status === 403) {
+        setError('Access denied. Only this event’s organizer and administrators can manage its attendees.');
       }
     } finally {
       setLoading(false);
     }
-  }, [eventId, statusFilter]);
+  }, [eventId, page, queryFilters]);
 
   useEffect(() => {
-    fetchEventDetails();
-  }, [fetchEventDetails]);
+    fetchEvent();
+  }, [fetchEvent]);
 
   useEffect(() => {
-    fetchAttendees(1);
-  }, [fetchAttendees]);
+    const timer = setTimeout(() => fetchAttendees(page), filters.search ? 250 : 0);
+    return () => clearTimeout(timer);
+  }, [fetchAttendees, filters.search, page]);
+
+  const setFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+    setPage(1);
+    setSelectedIds(new Set());
+    setActionMessage('');
+  };
+
+  const toggleSort = (sortBy) => {
+    setSort((current) => ({
+      sortBy,
+      sortOrder: current.sortBy === sortBy && current.sortOrder === 'asc' ? 'desc' : 'asc'
+    }));
+    setPage(1);
+  };
+
+  const toggleRowSelection = (registrationId) => {
+    setSelectedIds((current) => {
+      const updated = new Set(current);
+      if (updated.has(registrationId)) updated.delete(registrationId);
+      else updated.add(registrationId);
+      return updated;
+    });
+  };
+
+  const selectCurrentPage = (checked) => {
+    setSelectedIds((current) => {
+      const updated = new Set(current);
+      attendees.forEach((registration) => {
+        const registrationId = getRegistrationId(registration);
+        if (checked) updated.add(registrationId);
+        else updated.delete(registrationId);
+      });
+      return updated;
+    });
+  };
+
+  const selectAllFiltered = async () => {
+    setError('');
+    try {
+      const result = await registrationService.getEventAttendeeIds(eventId, queryFilters);
+      setSelectedIds(new Set((result.data || []).map(String)));
+      setActionMessage(`Selected all ${result.data?.length || 0} matching registrations.`);
+    } catch (requestError) {
+      setError(extractErrorMessage(requestError, 'Could not select matching registrations.'));
+    }
+  };
+
+  const fetchAllFiltered = () => fetchAllAttendeePages(
+    (targetPage, limit, params) => registrationService.getEventAttendees(eventId, {
+      ...params,
+      page: targetPage,
+      limit
+    }),
+    queryFilters
+  );
+
+  const exportAttendees = async (format) => {
+    if (exportingRef.current) return;
+    exportingRef.current = true;
+    setExportingFormat(format);
+    setError('');
+    try {
+      const allAttendees = await fetchAllFiltered();
+      const rows = selectAttendeesForExport(allAttendees, selectedIds);
+      if (selectedIds.size > 0 && rows.length === 0) {
+        throw new Error('Your selected attendees no longer match the current filters. Update your selection and retry.');
+      }
+      const filename = getExportFilename(event, format);
+      if (format === 'pdf') await downloadAttendeePdf(event, rows, filename);
+      else if (format === 'xlsx') await downloadAttendeeExcel(event, rows, filename);
+      else downloadAttendeeCsv(rows, filename);
+      setActionMessage(`${format.toUpperCase()} export generated for ${rows.length} attendee ${rows.length === 1 ? 'record' : 'records'}.`);
+    } catch (requestError) {
+      setError(extractErrorMessage(requestError, `The ${format.toUpperCase()} export could not be prepared.`));
+    } finally {
+      exportingRef.current = false;
+      setExportingFormat('');
+    }
+  };
+
+  const updateAttendance = async (updates) => {
+    setSavingAttendance(true);
+    setError('');
+    setActionMessage('');
+    try {
+      let updatedCount = 0;
+      for (let index = 0; index < updates.length; index += MAX_BULK_SIZE) {
+        const batch = updates.slice(index, index + MAX_BULK_SIZE);
+        const response = await registrationService.updateEventAttendance(eventId, batch);
+        updatedCount += response.data?.updatedCount || 0;
+      }
+      setSelectedIds(new Set());
+      setBulkAttendanceStatus('');
+      setActionMessage(`${updatedCount} attendance ${updatedCount === 1 ? 'record was' : 'records were'} updated.`);
+      await fetchAttendees(page);
+    } catch (requestError) {
+      setError(extractErrorMessage(requestError, 'Attendance could not be updated.'));
+      await fetchAttendees(page);
+    } finally {
+      setSavingAttendance(false);
+    }
+  };
+
+  const updateOneAttendance = async (registration, attendanceStatus) => {
+    await updateAttendance([{
+      registrationId: getRegistrationId(registration),
+      attendanceStatus
+    }]);
+  };
+
+  const updateSelectedAttendance = async () => {
+    if (!bulkAttendanceStatus || selectedIds.size === 0) return;
+    try {
+      const allFiltered = await fetchAllFiltered();
+      const updates = allFiltered
+        .filter((registration) =>
+          selectedIds.has(getRegistrationId(registration)) && registration.status === 'registered')
+        .map((registration) => ({
+          registrationId: getRegistrationId(registration),
+          attendanceStatus: bulkAttendanceStatus
+        }));
+      if (updates.length === 0) {
+        setError('Attendance can only be updated for active registrations.');
+        return;
+      }
+      await updateAttendance(updates);
+    } catch (requestError) {
+      setError(extractErrorMessage(requestError, 'Could not load selected attendees for attendance update.'));
+    }
+  };
+
+  const allCurrentSelected = attendees.length > 0 &&
+    attendees.every((registration) => selectedIds.has(getRegistrationId(registration)));
+
+  const displayedColumns = columns.filter((column) => visibleColumns.includes(column.id));
+
+  const registrationStats = [
+    { label: 'Total registrations', value: summary.totalAll, icon: Users, tone: 'text-[#4C1D95] bg-purple-50' },
+    { label: 'Active', value: summary.activeCount, icon: Check, tone: 'text-emerald-700 bg-emerald-50' },
+    { label: 'Cancelled', value: summary.cancelledCount, icon: X, tone: 'text-slate-600 bg-slate-100' },
+    { label: 'Present', value: summary.presentCount, icon: Check, tone: 'text-[#7C3AED] bg-violet-50' },
+    { label: 'Absent', value: summary.absentCount, icon: X, tone: 'text-rose-700 bg-rose-50' },
+    { label: 'Not marked', value: summary.notMarkedCount, icon: Clock3, tone: 'text-amber-700 bg-amber-50' }
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb & Navigation */}
-      <div className="flex items-center gap-2 text-xs text-slate-500">
-        <Link
-          to="/organizer/events"
-          className="inline-flex items-center gap-1 font-medium hover:text-indigo-600 transition-colors"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back to My Events</span>
-        </Link>
-        <span>/</span>
-        <span className="text-slate-800 font-semibold truncate max-w-xs">
-          {event?.title || 'Event Roster'}
-        </span>
-      </div>
+    <div className="mx-auto w-full max-w-[1440px] min-w-0 space-y-6 pb-8">
+      <Link
+        to="/organizer/events"
+        className="inline-flex min-h-9 items-center gap-2 rounded-lg text-sm font-semibold text-[#6D28D9] hover:text-[#4C1D95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+      >
+        <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+        Back to My Events
+      </Link>
 
-      {/* Top Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                <Users className="w-3.5 h-3.5" />
-                Attendee Roster
+      <section className="relative z-20 rounded-[1.75rem] bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#EC4899] p-5 text-white shadow-lg shadow-violet-950/10 sm:p-7 lg:p-8">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[1.75rem]">
+          <div className="absolute -right-10 -top-20 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+        </div>
+        <div className="relative z-10 flex min-w-0 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-100">Attendee manager</p>
+            <h1 className="mt-2 break-words text-2xl font-extrabold tracking-tight sm:text-3xl">
+              {eventLoading ? 'Loading event…' : event?.title || 'Event attendees'}
+            </h1>
+            <div className="mt-4 flex min-w-0 flex-wrap gap-x-5 gap-y-2 text-sm text-violet-100">
+              <span className="inline-flex items-center gap-2">
+                <CalendarDays aria-hidden="true" className="h-4 w-4 shrink-0" />
+                {formatDate(event?.startDateTime, true)}
               </span>
-              {event?.category && (
-                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
-                  {event.category}
+              <span className="inline-flex min-w-0 items-center gap-2">
+                <MapPin aria-hidden="true" className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  {typeof event?.venue === 'object' && event.venue
+                    ? event.venue.name || 'Venue'
+                    : 'Venue not assigned'}
+                </span>
+              </span>
+              <Badge className="border-white/25 bg-white/10 text-white">{lifecycleLabel(event)}</Badge>
+              {event?.capacity && (
+                <span className="inline-flex items-center gap-2">
+                  <Users aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  Capacity {event.capacity}
                 </span>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              {event?.title || 'Attendee Management'}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500">
-              Real-time headcount, attendee contact information, and admission status.
-            </p>
           </div>
-
-          {event && (
-            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 text-xs text-slate-600 shrink-0 space-y-1">
-              <div className="flex items-center gap-1.5 font-medium text-slate-800">
-                <Calendar className="w-3.5 h-3.5 text-indigo-600" />
-                <span>{formatDisplayDate(event.startDateTime)}</span>
-              </div>
-              <div className="text-[11px] text-slate-400">
-                {formatDisplayTime(event.startDateTime)} – {formatDisplayTime(event.endDateTime)}
-              </div>
-              <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-200/60 flex items-center justify-between gap-4">
-                <span>Capacity:</span>
-                <strong className="text-slate-800">{event.capacity} seats</strong>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 403 Forbidden State */}
-      {isForbidden ? (
-        <div className="bg-white rounded-2xl border border-rose-200 p-12 text-center shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4">
-            <ShieldAlert className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">Restricted Access</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-5">
-            You do not have permission to view the attendee list for this event. Attendee records are strictly accessible only to the event organizer who created it or campus administrators.
-          </p>
-          <Link
-            to="/organizer/events"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-xs"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Return to Your Events</span>
-          </Link>
-        </div>
-      ) : (
-        <>
-          {/* Summary Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Active / Confirmed */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">Confirmed Attendees</span>
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <UserCheck className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-slate-900">{summary.activeCount}</span>
-                {event?.capacity && (
-                  <span className="text-xs text-slate-400">
-                    of {event.capacity} capacity ({Math.round(((summary.activeCount || 0) / event.capacity) * 100)}%)
-                  </span>
-                )}
-              </div>
-              <div className="mt-1 text-[11px] text-emerald-700 font-medium">
-                Active admission passes
-              </div>
-            </div>
-
-            {/* Cancelled */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">Cancelled Registrations</span>
-                <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                  <UserX className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-extrabold text-slate-900">{summary.cancelledCount}</span>
-              </div>
-              <div className="mt-1 text-[11px] text-slate-400">
-                Seats returned to pool
-              </div>
-            </div>
-
-            {/* Total Historical */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">Total All-Time Records</span>
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                  <Ticket className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-extrabold text-slate-900">{summary.totalAll}</span>
-              </div>
-              <div className="mt-1 text-[11px] text-slate-400">
-                Total enrollments recorded
-              </div>
-            </div>
-          </div>
-
-          {/* Filter Bar */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
-            <div className="flex items-center gap-2 overflow-x-auto text-xs">
-              {[
-                { id: 'all', label: `All (${summary.totalAll})` },
-                { id: 'registered', label: `Confirmed (${summary.activeCount})` },
-                { id: 'cancelled', label: `Cancelled (${summary.cancelledCount})` }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg font-semibold transition-colors shrink-0 ${
-                    statusFilter === tab.id
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Global Error Banner */}
-          {error && !isForbidden && (
-            <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                <span>{error}</span>
-              </div>
-              <button
-                onClick={() => fetchAttendees(pagination.page)}
-                className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-semibold text-[11px]"
+          <div className="flex flex-wrap gap-2">
+            <details
+              ref={exportMenuRef}
+              className="relative"
+              onToggle={(event) => setExportMenuOpen(event.currentTarget.open)}
+            >
+              <summary
+                aria-disabled={exporting}
+                aria-busy={exporting}
+                onClick={(event) => { if (exporting) event.preventDefault(); }}
+                className={`flex min-h-11 list-none items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
+                  exporting ? 'cursor-wait opacity-80' : 'cursor-pointer hover:bg-white/15'
+                }`}
               >
-                Retry
-              </button>
-            </div>
-          )}
-
-          {/* Attendee Roster Table */}
-          {loading ? (
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
-              <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-3" />
-              <p className="text-xs text-slate-500 font-medium">Loading attendee roster...</p>
-            </div>
-          ) : attendees.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6" />
+                <Download aria-hidden="true" className="h-4 w-4" />
+                {exporting ? `Preparing ${exportingFormat.toUpperCase()}…` : 'Export'}
+                {exporting
+                  ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                  : <ChevronDown aria-hidden="true" className="h-4 w-4" />}
+              </summary>
+              <div className="absolute right-0 z-50 mt-2 w-60 max-w-[calc(100vw-2.5rem)] rounded-xl border border-border bg-surface p-2 text-text-primary shadow-xl">
+                <button type="button" disabled={exporting} onClick={() => { closeExportMenu(true); exportAttendees('pdf'); }} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-60">
+                  {exportingFormat === 'pdf'
+                    ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                    : <FileText aria-hidden="true" className="h-4 w-4 text-rose-700" />}
+                  Download PDF
+                </button>
+                <button type="button" disabled={exporting} onClick={() => { closeExportMenu(true); exportAttendees('xlsx'); }} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-60">
+                  {exportingFormat === 'xlsx'
+                    ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                    : <FileSpreadsheet aria-hidden="true" className="h-4 w-4 text-emerald-700" />}
+                  Download Excel (.xlsx)
+                </button>
+                <button type="button" disabled={exporting} onClick={() => { closeExportMenu(true); exportAttendees('csv'); }} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-60">
+                  {exportingFormat === 'csv'
+                    ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                    : <FileSpreadsheet aria-hidden="true" className="h-4 w-4 text-violet-700" />}
+                  Download CSV
+                </button>
               </div>
-              <h3 className="text-base font-bold text-slate-900">
-                {statusFilter === 'all'
-                  ? 'No attendees registered yet'
-                  : `No ${statusFilter} attendees`}
-              </h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                {statusFilter === 'all'
-                  ? 'Participants who register through the campus portal will appear on this roster in real time.'
-                  : `There are currently no attendees matching the "${statusFilter}" status filter.`}
-              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      {eventError && <Alert variant="error">{eventError}</Alert>}
+      {error && (
+        <Alert variant="error" title="Could not complete the request">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{error}</span>
+            <Button size="sm" variant="outline" onClick={() => fetchAttendees(page)}>
+              <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" /> Retry
+            </Button>
+          </div>
+        </Alert>
+      )}
+      {actionMessage && (
+        <Alert variant="success" onDismiss={() => setActionMessage('')}>{actionMessage}</Alert>
+      )}
+
+      <section aria-label="Registration and attendance summary" className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        {registrationStats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <Card key={stat.label} className="min-w-0 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-text-muted">{stat.label}</span>
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${stat.tone}`}>
+                  <Icon aria-hidden="true" className="h-4 w-4" />
+                </span>
+              </div>
+              <p className="mt-3 text-2xl font-bold tracking-tight text-text-primary">{stat.value}</p>
+            </Card>
+          );
+        })}
+      </section>
+
+      <Card className="min-w-0">
+        <CardHeader className="gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>Attendee register</CardTitle>
+              <p className="mt-1 text-sm text-text-muted">Search, filter, select and update attendance for this event.</p>
             </div>
+            <Button variant="outline" size="sm" loading={loading || exporting} onClick={() => fetchAttendees(page)}>
+              <RefreshCw aria-hidden="true" className="h-4 w-4" />
+              Refresh
+            </Button>
+          </div>
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <label className="sm:col-span-2 xl:col-span-2">
+              <span className="sr-only">Search participants by name or email</span>
+              <div className="relative">
+                <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                <Input
+                  type="search"
+                  value={filters.search}
+                  onChange={(eventChange) => setFilter('search', eventChange.target.value)}
+                  placeholder="Search name or email"
+                  className="pl-9"
+                  aria-label="Search participants by name or email"
+                />
+              </div>
+            </label>
+            <label>
+              <span className="sr-only">Registration status</span>
+              <Select value={filters.status} onChange={(eventChange) => setFilter('status', eventChange.target.value)} aria-label="Filter registration status">
+                <option value="">All registration statuses</option>
+                <option value="registered">Registered</option>
+                <option value="cancelled">Cancelled</option>
+              </Select>
+            </label>
+            <label>
+              <span className="sr-only">Attendance status</span>
+              <Select value={filters.attendanceStatus} onChange={(eventChange) => setFilter('attendanceStatus', eventChange.target.value)} aria-label="Filter attendance status">
+                <option value="">All attendance statuses</option>
+                {ATTENDANCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </Select>
+            </label>
+            <label>
+              <span className="sr-only">Filter by department or organization</span>
+              <Input value={filters.department} onChange={(eventChange) => setFilter('department', eventChange.target.value)} placeholder="Department" aria-label="Filter by department or organization" />
+            </label>
+            <div className="grid grid-cols-2 gap-2 sm:col-span-2 xl:col-span-6 xl:grid-cols-[1fr_1fr_auto_auto]">
+              <label>
+                <span className="sr-only">Registration date from</span>
+                <Input type="date" value={filters.dateFrom} onChange={(eventChange) => setFilter('dateFrom', eventChange.target.value)} aria-label="Registration date from" />
+              </label>
+              <label>
+                <span className="sr-only">Registration date to</span>
+                <Input type="date" value={filters.dateTo} onChange={(eventChange) => setFilter('dateTo', eventChange.target.value)} aria-label="Registration date to" />
+              </label>
+              <Button variant="ghost" size="sm" onClick={() => { setFilters({ search: '', status: '', attendanceStatus: '', department: '', dateFrom: '', dateTo: '' }); setPage(1); setSelectedIds(new Set()); }}>
+                <Filter aria-hidden="true" className="h-4 w-4" /> Clear filters
+              </Button>
+              <details className="relative">
+                <summary className="flex min-h-10 cursor-pointer list-none items-center justify-center gap-2 rounded-control border border-border-strong bg-surface px-3 text-sm font-medium text-text-primary hover:bg-background">
+                  <SlidersHorizontal aria-hidden="true" className="h-4 w-4" /> Columns
+                </summary>
+                <div className="absolute right-0 z-20 mt-2 max-h-72 w-60 overflow-y-auto rounded-xl border border-border bg-surface p-3 shadow-xl">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Visible columns</p>
+                  {columns.filter((column) => column.id !== 'actions').map((column) => (
+                    <label key={column.id} className="flex min-h-9 items-center gap-2 text-sm text-text-primary">
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns.includes(column.id)}
+                        onChange={(eventChange) => setVisibleColumns((current) => eventChange.target.checked
+                          ? [...current, column.id]
+                          : current.filter((id) => id !== column.id))}
+                        className="h-4 w-4 accent-violet-700"
+                      />
+                      {column.label}
+                    </label>
+                  ))}
+                </div>
+              </details>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-background p-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-text-secondary">
+              <span className="font-semibold">{selectedIds.size} selected</span>
+              <Button size="sm" variant="ghost" onClick={selectAllFiltered} disabled={loading}>
+                Select all {pagination.total} filtered
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} disabled={selectedIds.size === 0}>
+                Clear selection
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={bulkAttendanceStatus}
+                onChange={(eventChange) => setBulkAttendanceStatus(eventChange.target.value)}
+                aria-label="Choose bulk attendance status"
+                className="w-auto min-w-40"
+              >
+                <option value="">Set attendance…</option>
+                {ATTENDANCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </Select>
+              <Button
+                size="sm"
+                disabled={!bulkAttendanceStatus || selectedIds.size === 0}
+                loading={savingAttendance}
+                onClick={updateSelectedAttendance}
+              >
+                Apply
+              </Button>
+            </div>
+          </div>
+
+          {loading ? (
+            <LoadingState label="Loading attendee records…" className="py-12" />
+          ) : attendees.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title={filters.search || filters.status || filters.attendanceStatus || filters.department
+                ? 'No matching attendees'
+                : 'No attendees yet'}
+              description={filters.search || filters.status || filters.attendanceStatus || filters.department
+                ? 'Try adjusting or clearing the filters.'
+                : 'Participant registrations for this event will appear here.'}
+            />
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+            <>
+              <div className="max-w-full overflow-auto rounded-xl border border-border">
+                <table className="w-full min-w-[980px] border-separate border-spacing-0 text-left text-sm">
+                  <thead className="sticky top-0 z-10 bg-background text-[11px] font-semibold uppercase tracking-wide text-text-muted">
                     <tr>
-                      <th className="py-3 px-4">Participant</th>
-                      <th className="py-3 px-4">Contact</th>
-                      <th className="py-3 px-4">Organization / Dept</th>
-                      <th className="py-3 px-4">Academic Year</th>
-                      <th className="py-3 px-4">Registered Date</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Ticket Ref</th>
+                      <th className="sticky left-0 z-20 border-b border-border bg-background px-3 py-3">
+                        <input
+                          type="checkbox"
+                          aria-label="Select all attendees on this page"
+                          checked={allCurrentSelected}
+                          onChange={(eventChange) => selectCurrentPage(eventChange.target.checked)}
+                          className="h-4 w-4 accent-violet-700"
+                        />
+                      </th>
+                      {displayedColumns.map((column) => (
+                        <th key={column.id} scope="col" className="whitespace-nowrap border-b border-border px-3 py-3">
+                          {['registrationId', 'phone', 'actions'].includes(column.id)
+                            ? column.label
+                            : (
+                              <button type="button" onClick={() => toggleSort(column.id === 'name' ? 'name' : column.id === 'email' ? 'email' : column.id === 'organization' ? 'organization' : column.id === 'registeredAt' ? 'registeredAt' : column.id === 'status' ? 'status' : column.id === 'attendanceStatus' ? 'attendanceStatus' : 'academicYear')} className="inline-flex items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
+                                {column.label}
+                                {sort.sortBy === column.id && (sort.sortOrder === 'asc' ? <ArrowUp aria-hidden="true" className="h-3 w-3" /> : <ArrowDown aria-hidden="true" className="h-3 w-3" />)}
+                              </button>
+                            )}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {attendees.map((reg) => {
-                      const participant = reg.participant || {};
-                      const badge = getRegistrationStatusBadge(reg.status);
-                      const StatusIcon = badge.icon === CheckCircle2 ? CheckCircle2 : XCircle;
-                      const regId = reg._id || reg.id;
-
+                  <tbody className="divide-y divide-border">
+                    {attendees.map((registration) => {
+                      const registrationId = getRegistrationId(registration);
+                      const participant = registration.participant || {};
+                      const attendanceStatus = registration.attendanceStatus || 'not_marked';
                       return (
-                        <tr key={regId} className="hover:bg-slate-50/60 transition-colors">
-                          {/* Participant Name */}
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-900">{participant.name || 'Anonymous Attendee'}</div>
-                            <div className="text-[10px] text-slate-400 capitalize">{participant.role || 'Participant'}</div>
+                        <tr key={registrationId} className="group bg-surface transition-colors hover:bg-violet-50/40">
+                          <td className="sticky left-0 z-[1] border-b border-border bg-inherit px-3 py-3">
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${participant.name || 'attendee'}`}
+                              checked={selectedIds.has(registrationId)}
+                              onChange={() => toggleRowSelection(registrationId)}
+                              className="h-4 w-4 accent-violet-700"
+                            />
                           </td>
-
-                          {/* Contact */}
-                          <td className="py-3.5 px-4 space-y-0.5">
-                            <div className="flex items-center gap-1.5 text-slate-700">
-                              <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                              <a href={`mailto:${participant.email}`} className="hover:underline">
-                                {participant.email || '—'}
-                              </a>
-                            </div>
-                            {participant.phone && (
-                              <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                                <Phone className="w-3 h-3 shrink-0" />
-                                <span>{participant.phone}</span>
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Organization */}
-                          <td className="py-3.5 px-4">
-                            <span className="text-slate-600">
-                              {participant.organization || '—'}
-                            </span>
-                          </td>
-
-                          {/* Academic Year */}
-                          <td className="py-3.5 px-4">
-                            <span className="text-slate-600">{formatAcademicYear(reg.academicYear)}</span>
-                          </td>
-
-                          {/* Registered Date */}
-                          <td className="py-3.5 px-4">
-                            <div className="font-medium text-slate-800">{formatDisplayDate(reg.createdAt)}</div>
-                            <div className="text-[10px] text-slate-400">{formatDisplayTime(reg.createdAt)}</div>
-                          </td>
-
-                          {/* Status */}
-                          <td className="py-3.5 px-4">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${badge.classes}`}
-                            >
-                              <StatusIcon className="w-3 h-3" />
-                              <span>{badge.label}</span>
-                            </span>
-                            {reg.status === 'cancelled' && reg.cancellationReason && (
-                              <div
-                                className="text-[10px] text-rose-700 mt-0.5 max-w-xs truncate"
-                                title={reg.cancellationReason}
-                              >
-                                &quot;{reg.cancellationReason}&quot;
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Reference */}
-                          <td className="py-3.5 px-4">
-                            <code className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md">
-                              {String(regId).slice(-6).toUpperCase()}
-                            </code>
-                          </td>
+                          {displayedColumns.map((column) => {
+                            if (column.id === 'registrationId') return (
+                              <td key={column.id} className="whitespace-nowrap px-3 py-3 font-mono text-xs text-text-muted">{registrationId.slice(-8).toUpperCase()}</td>
+                            );
+                            if (column.id === 'name') return (
+                              <td key={column.id} className="min-w-48 px-3 py-3">
+                                <span className="block max-w-56 truncate font-semibold text-text-primary">{participant.name || 'Anonymous attendee'}</span>
+                                <span className="mt-0.5 block text-xs text-text-muted">{participant.role || 'Participant'}</span>
+                              </td>
+                            );
+                            if (column.id === 'email') return (
+                              <td key={column.id} className="max-w-60 px-3 py-3">
+                                <a href={`mailto:${participant.email || ''}`} className="inline-flex max-w-full items-center gap-1.5 truncate text-[#6D28D9] hover:underline">
+                                  <Mail aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                                  {participant.email || '—'}
+                                </a>
+                              </td>
+                            );
+                            if (column.id === 'phone') return (
+                              <td key={column.id} className="whitespace-nowrap px-3 py-3 text-text-secondary">{participant.phone || '—'}</td>
+                            );
+                            if (column.id === 'organization') return (
+                              <td key={column.id} className="max-w-48 truncate px-3 py-3 text-text-secondary">{participant.organization || '—'}</td>
+                            );
+                            if (column.id === 'academicYear') return (
+                              <td key={column.id} className="whitespace-nowrap px-3 py-3 text-text-secondary">{formatAcademicYear(registration.academicYear)}</td>
+                            );
+                            if (column.id === 'registeredAt') return (
+                              <td key={column.id} className="whitespace-nowrap px-3 py-3 text-text-secondary">{formatDate(registration.registeredAt || registration.createdAt, true)}</td>
+                            );
+                            if (column.id === 'status') return (
+                              <td key={column.id} className="whitespace-nowrap px-3 py-3">
+                                <Badge variant={registrationStatusVariant(registration.status)}>{registration.status || 'Unknown'}</Badge>
+                              </td>
+                            );
+                            if (column.id === 'attendanceStatus') return (
+                              <td key={column.id} className="whitespace-nowrap px-3 py-3">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={attendanceVariant(attendanceStatus)}>{attendanceStatus.replace('_', ' ')}</Badge>
+                                  {registration.status === 'registered' && (
+                                    <Select
+                                      aria-label={`Attendance for ${participant.name || 'attendee'}`}
+                                      value={attendanceStatus}
+                                      disabled={savingAttendance}
+                                      onChange={(eventChange) => updateOneAttendance(registration, eventChange.target.value)}
+                                      className="min-h-8 w-auto min-w-32 py-1 text-xs"
+                                    >
+                                      {ATTENDANCE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                    </Select>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                            return (
+                              <td key={column.id} className="whitespace-nowrap px-3 py-3">
+                                <Button size="sm" variant="ghost" onClick={() => setSelectedRegistration(registration)} aria-label={`View details for ${participant.name || 'attendee'}`}>
+                                  <Eye aria-hidden="true" className="h-4 w-4" /> Details
+                                </Button>
+                              </td>
+                            );
+                          })}
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-
-              {/* Pagination Controls */}
-              {pagination.pages > 1 && (
-                <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                  <div>
-                    Page <strong className="text-slate-800">{pagination.page}</strong> of{' '}
-                    <strong className="text-slate-800">{pagination.pages}</strong> ({pagination.total} attendees)
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      disabled={pagination.page <= 1 || loading}
-                      onClick={() => fetchAttendees(pagination.page - 1)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                      <span>Previous</span>
-                    </button>
-                    <button
-                      disabled={pagination.page >= pagination.pages || loading}
-                      onClick={() => fetchAttendees(pagination.page + 1)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <span>Next</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+              <Pagination page={pagination.page} totalPages={pagination.pages} onPageChange={setPage} className="mt-4" label="Attendee pages" />
+              <p className="mt-3 text-xs text-text-muted" aria-live="polite">
+                Showing {attendees.length} of {pagination.total} matching registrations.
+              </p>
+            </>
           )}
-        </>
+        </CardContent>
+      </Card>
+
+      {selectedRegistration && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedRegistration(null); }}
+          onKeyDown={(event) => { if (event.key === 'Escape') setSelectedRegistration(null); }}
+        >
+          <section role="dialog" aria-modal="true" aria-labelledby="registration-details-title" className="w-full max-w-lg rounded-2xl border border-border bg-surface p-5 shadow-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Registration details</p>
+                <h2 id="registration-details-title" className="mt-1 break-words text-xl font-bold text-text-primary">
+                  {selectedRegistration.participant?.name || 'Attendee'}
+                </h2>
+              </div>
+              <Button variant="ghost" size="icon" aria-label="Close registration details" onClick={() => setSelectedRegistration(null)}>
+                <X aria-hidden="true" className="h-4 w-4" />
+              </Button>
+            </div>
+            <dl className="mt-5 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+              <div><dt className="text-xs text-text-muted">Email</dt><dd className="mt-1 break-all font-medium text-text-primary">{selectedRegistration.participant?.email || '—'}</dd></div>
+              <div><dt className="text-xs text-text-muted">Phone</dt><dd className="mt-1 font-medium text-text-primary">{selectedRegistration.participant?.phone || '—'}</dd></div>
+              <div><dt className="text-xs text-text-muted">Department / organization</dt><dd className="mt-1 font-medium text-text-primary">{selectedRegistration.participant?.organization || '—'}</dd></div>
+              <div><dt className="text-xs text-text-muted">Academic year</dt><dd className="mt-1 font-medium text-text-primary">{formatAcademicYear(selectedRegistration.academicYear)}</dd></div>
+              <div><dt className="text-xs text-text-muted">Registration ID</dt><dd className="mt-1 break-all font-mono text-xs text-text-primary">{getRegistrationId(selectedRegistration)}</dd></div>
+              <div><dt className="text-xs text-text-muted">Registered</dt><dd className="mt-1 font-medium text-text-primary">{formatDate(selectedRegistration.registeredAt || selectedRegistration.createdAt, true)}</dd></div>
+              <div><dt className="text-xs text-text-muted">Registration status</dt><dd className="mt-1"><Badge variant={registrationStatusVariant(selectedRegistration.status)}>{selectedRegistration.status}</Badge></dd></div>
+              <div><dt className="text-xs text-text-muted">Attendance</dt><dd className="mt-1"><Badge variant={attendanceVariant(selectedRegistration.attendanceStatus)}>{(selectedRegistration.attendanceStatus || 'not_marked').replace('_', ' ')}</Badge></dd></div>
+            </dl>
+            <div className="mt-6 flex justify-end">
+              <Button variant="outline" onClick={() => setSelectedRegistration(null)}>Close</Button>
+            </div>
+          </section>
+        </div>
       )}
     </div>
   );

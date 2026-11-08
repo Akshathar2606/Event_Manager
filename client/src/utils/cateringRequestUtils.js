@@ -82,14 +82,14 @@ export const getCateringRequestStatusBadge = (status) => {
     case 'cancelled':
       return {
         label: 'Cancelled',
-        classes: 'bg-slate-100 text-slate-700 border-slate-300',
-        dotClass: 'bg-slate-400'
+        classes: 'bg-surface-subtle text-text-secondary border-border-strong',
+        dotClass: 'bg-text-muted'
       };
     default:
       return {
         label: status || 'Unknown',
-        classes: 'bg-slate-50 text-slate-700 border-slate-200',
-        dotClass: 'bg-slate-400'
+        classes: 'bg-background text-text-secondary border-border',
+        dotClass: 'bg-text-muted'
       };
   }
 };
@@ -180,8 +180,12 @@ export const validateCateringRequestForm = ({
   } else if (!Number.isInteger(count) || count < 1) {
     errors.push('Guest count must be a whole number of at least 1 person.');
   } else {
-    if (selectedPackage && selectedPackage.minOrder && count < selectedPackage.minOrder) {
-      errors.push(`Guest count (${count}) is below the package minimum order of ${selectedPackage.minOrder} guests.`);
+    const minOrder = selectedPackage?.minOrder ?? 10;
+    if (selectedPackage && count < minOrder) {
+      errors.push(`Guest count (${count}) is below the package minimum order of ${minOrder} guests.`);
+    }
+    if (selectedPackage && selectedPackage.maxGuests != null && count > selectedPackage.maxGuests) {
+      errors.push(`Guest count (${count}) exceeds the package maximum capacity of ${selectedPackage.maxGuests} guests.`);
     }
     if (selectedEvent && selectedEvent.capacity && count > selectedEvent.capacity) {
       errors.push(`Guest count (${count}) exceeds event venue capacity of ${selectedEvent.capacity} guests.`);

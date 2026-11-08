@@ -589,6 +589,65 @@ describe('EventFlow Event Management Test Suite', () => {
       assert.equal(res.body.count, 1);
       assert.equal(res.body.data[0].category, 'cultural');
     });
+
+    test('Lifecycle filters return completed events without changing their stored status', async () => {
+      const completedEvent = {
+        ...publishedEvent,
+        id: new mongoose.Types.ObjectId().toString(),
+        title: 'Historical Completed Event',
+        startDateTime: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        endDateTime: new Date(Date.now() - 2 * 60 * 60 * 1000)
+      };
+      app.locals.mockEventStore.set(completedEvent.id, completedEvent);
+
+      const res = await request(app, {
+        method: 'GET',
+        url: '/api/events?status=completed',
+        headers: { authorization: `Bearer ${adminToken}` }
+      });
+
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body.data.map((event) => event.id), [completedEvent.id]);
+      assert.equal(res.body.data[0].status, 'published');
+      assert.equal(res.body.data[0].lifecycleStatus, 'completed');
+    });
+
+    test('Administrator cancellation filter includes only explicitly cancelled events', async () => {
+      const res = await request(app, {
+        method: 'GET',
+        url: '/api/events?status=cancelled',
+        headers: { authorization: `Bearer ${adminToken}` }
+      });
+
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body.data.map((event) => event.id), [cancelledEvent.id]);
+      assert.equal(res.body.data[0].lifecycleStatus, 'cancelled');
+    });
+
+    test('Completed event schedule changes are rejected while details remain readable', async () => {
+      const completedEvent = {
+        ...publishedEvent,
+        id: new mongoose.Types.ObjectId().toString(),
+        title: 'Read-Only Completed Event',
+        startDateTime: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        endDateTime: new Date(Date.now() - 2 * 60 * 60 * 1000)
+      };
+      app.locals.mockEventStore.set(completedEvent.id, completedEvent);
+
+      const res = await request(app, {
+        method: 'PUT',
+        url: `/api/events/${completedEvent.id}`,
+        headers: { authorization: `Bearer ${organizer1Token}` },
+        body: {
+          startDateTime: new Date().toISOString(),
+          endDateTime: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+        }
+      });
+
+      assert.equal(res.status, 400);
+      assert.match(res.body.message, /completed event/i);
+      assert.equal(app.locals.mockEventStore.get(completedEvent.id).startDateTime, completedEvent.startDateTime);
+    });
   });
 
   describe('Event Details & Access Control (GET /api/events/:id)', () => {

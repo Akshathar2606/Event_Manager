@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { User } = require('../models/User');
+const { VendorApplication } = require('../models/VendorApplication');
 const { verifyTokenPayload } = require('../utils/token');
 
 /**
@@ -81,14 +82,32 @@ const verifyToken = async (req, res, next) => {
         });
       }
 
+      const vendorApplication = user.role === 'vendor'
+        ? await VendorApplication.findOne({ vendorId: user._id }).select('status rejectionReason').lean()
+        : null;
+
       // Attach authoritative server-side user data (never trust client-supplied headers/body)
       req.user = {
         id: user._id.toString(),
         name: user.name,
+        firstName: user.firstName || user.name.split(/\s+/)[0] || '',
+        lastName: user.lastName || user.name.split(/\s+/).slice(1).join(' '),
         email: user.email,
         role: user.role, // Sourced directly from verified database record
         phone: user.phone || '',
         organization: user.organization || '',
+        location: user.location || '',
+        bio: user.bio || '',
+        interests: user.interests || [],
+        socialLinks: user.socialLinks || [],
+        ...(user.role === 'vendor' && {
+          vendorApplicationStatus: vendorApplication?.status || 'approved',
+          vendorRejectionReason: vendorApplication?.status === 'rejected'
+            ? vendorApplication.rejectionReason || ''
+            : ''
+        }),
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
         isActive: user.isActive
       };
     } else {
@@ -108,13 +127,30 @@ const verifyToken = async (req, res, next) => {
             message: 'Authorization token has been revoked. Please log in again.'
           });
         }
+        const application = mockUser.role === 'vendor'
+          ? req.app.locals.mockVendorApplicationStore?.get(mockUser.id)
+          : null;
         req.user = {
           id: mockUser.id,
           name: mockUser.name,
+          firstName: mockUser.firstName || mockUser.name.split(/\s+/)[0] || '',
+          lastName: mockUser.lastName || mockUser.name.split(/\s+/).slice(1).join(' '),
           email: mockUser.email,
           role: mockUser.role,
           phone: mockUser.phone || '',
           organization: mockUser.organization || '',
+          location: mockUser.location || '',
+          bio: mockUser.bio || '',
+          interests: mockUser.interests || [],
+          socialLinks: mockUser.socialLinks || [],
+          ...(mockUser.role === 'vendor' && {
+            vendorApplicationStatus: application?.status || 'approved',
+            vendorRejectionReason: application?.status === 'rejected'
+              ? application.rejectionReason || ''
+              : ''
+          }),
+          createdAt: mockUser.createdAt,
+          updatedAt: mockUser.updatedAt,
           isActive: mockUser.isActive
         };
       } else {

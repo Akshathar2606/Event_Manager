@@ -72,6 +72,12 @@ describe('Frontend Catering Service & Parameter Serialization Tests', () => {
       dietary: ['Vegetarian', 'Vegan'],
       cuisine: ['Continental', 'Italian'],
       maxPrice: 35,
+      city: 'Tumakuru',
+      locality: 'Siddaganga',
+      guestCount: 150,
+      latitude: 13.34,
+      longitude: 77.1,
+      radiusKm: 25,
       page: 1,
       emptyString: '',
       nullValue: null,
@@ -86,6 +92,12 @@ describe('Frontend Catering Service & Parameter Serialization Tests', () => {
     assert.equal(params.dietary, 'Vegetarian,Vegan');
     assert.equal(params.cuisine, 'Continental,Italian');
     assert.equal(params.maxPrice, 35);
+    assert.equal(params.city, 'Tumakuru');
+    assert.equal(params.locality, 'Siddaganga');
+    assert.equal(params.guestCount, 150);
+    assert.equal(params.latitude, 13.34);
+    assert.equal(params.longitude, 77.1);
+    assert.equal(params.radiusKm, 25);
     assert.equal(params.page, 1);
     assert.equal(params.emptyString, undefined);
     assert.equal(params.nullValue, undefined);

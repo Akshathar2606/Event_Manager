@@ -4,9 +4,18 @@ const { Venue } = require('../models/Venue');
 const { User } = require('../models/User');
 const { Booking } = require('../models/Booking');
 const {
+  recordEventActivity,
+  notifyRegisteredParticipants
+} = require('../services/workflowService');
+const {
   isValidObjectId,
   validateEventInput
 } = require('../utils/eventValidation');
+const {
+  DERIVED_EVENT_STATUSES,
+  getEventLifecycleStatus,
+  getEventLifecycleQuery
+} = require('../utils/eventLifecycle');
 
 /**
  * Accesses mock event store during in-memory automated tests.
@@ -54,6 +63,7 @@ const eventForReadResponse = (event, user) => {
   const serialized = event && typeof event.toObject === 'function'
     ? event.toObject()
     : { ...event };
+  serialized.lifecycleStatus = getEventLifecycleStatus(serialized);
   const isOwnerOrganizer =
     user &&
     user.role === 'organizer' &&
@@ -62,6 +72,18 @@ const eventForReadResponse = (event, user) => {
     delete serialized.whatsappGroupUrl;
   }
   return serialized;
+};
+
+const recordCompletionIfDetected = async (req, event) => {
+  if (!event || getEventLifecycleStatus(event) !== 'completed') return;
+  const eventId = getReferenceId(event);
+  await recordEventActivity(req, {
+    eventId,
+    actorId: null,
+    action: 'event_completed',
+    description: `Event "${event.title}" reached its scheduled completion time.`,
+    dedupeKey: `event-completed:${eventId}`
+  });
 };
 
 /**
@@ -174,7 +196,8 @@ const buildEventQuery = ({
   venue,
   organizer,
   startDate,
-  endDate
+  endDate,
+  now
 }) => {
   const conditions = [{ isArchived: false }];
   const isAdmin = user && user.role === 'administrator';
@@ -182,27 +205,27 @@ const buildEventQuery = ({
 
   // 1. Role-based visibility scoping
   if (isAdmin) {
-    if (status) {
-      conditions.push({ status });
-    }
+    // Administrator visibility is unrestricted apart from the requested filters.
   } else if (isOrganizer) {
     if (organizer === 'me') {
       conditions.push({ organizer: user.id });
-      if (status) {
-        conditions.push({ status });
-      }
     } else {
       // Organizer general browse: published events OR own events
       conditions.push({
         $or: [{ status: 'published' }, { organizer: user.id }]
       });
-      if (status) {
-        conditions.push({ status });
-      }
     }
   } else {
     // Participant, vendor, or other roles: strictly published events
     conditions.push({ status: 'published' });
+  }
+
+  if (status) {
+    conditions.push(
+      DERIVED_EVENT_STATUSES.includes(status)
+        ? getEventLifecycleQuery(status, now)
+        : { status }
+    );
   }
 
   // 2. Specific organizer filter if provided by admin or filtered by user
@@ -279,6 +302,7 @@ const getEvents = async (req, res, next) => {
     const isAdmin = user && user.role === 'administrator';
     const isOrganizer = user && user.role === 'organizer';
     const mockStore = getStore(req);
+    const now = new Date();
 
     // In-memory test store path
     if (mockStore) {
@@ -288,32 +312,32 @@ const getEvents = async (req, res, next) => {
       list = list.filter((e) => !e.isArchived);
 
       // Access control filtering
-      if (isAdmin) {
-        if (status) {
-          list = list.filter((e) => e.status === status);
-        }
-      } else if (isOrganizer) {
-        if (organizer === 'me') {
-          list = list.filter((e) => {
-            const orgId = typeof e.organizer === 'object' ? (e.organizer.id || e.organizer._id) : e.organizer;
-            return String(orgId) === user.id;
-          });
-          if (status) {
-            list = list.filter((e) => e.status === status);
+      if (!isAdmin) {
+        if (isOrganizer) {
+          if (organizer === 'me') {
+            list = list.filter((e) => {
+              const orgId = typeof e.organizer === 'object' ? (e.organizer.id || e.organizer._id) : e.organizer;
+              return String(orgId) === user.id;
+            });
+          } else {
+            // General browse: published events + own events
+            list = list.filter((e) => {
+              const orgId = typeof e.organizer === 'object' ? (e.organizer.id || e.organizer._id) : e.organizer;
+              return e.status === 'published' || String(orgId) === user.id;
+            });
           }
         } else {
-          // General browse: published events + own events
-          list = list.filter((e) => {
-            const orgId = typeof e.organizer === 'object' ? (e.organizer.id || e.organizer._id) : e.organizer;
-            return e.status === 'published' || String(orgId) === user.id;
-          });
-          if (status) {
-            list = list.filter((e) => e.status === status);
-          }
+          // Participant, vendor, or other roles: strictly published events
+          list = list.filter((e) => e.status === 'published');
         }
-      } else {
-        // Participant, vendor, or other roles: strictly published events
-        list = list.filter((e) => e.status === 'published');
+      }
+
+      if (status) {
+        list = list.filter((event) => (
+          DERIVED_EVENT_STATUSES.includes(status)
+            ? getEventLifecycleStatus(event, now) === status
+            : event.status === status
+        ));
       }
 
       // Keyword search
@@ -561,11 +585,18 @@ const createEvent = async (req, res, next) => {
       };
 
       mockStore.set(newId, newEvent);
+      await recordEventActivity(req, {
+        eventId: newId,
+        actorId: req.user.id,
+        action: 'event_created',
+        description: `Event "${newEvent.title}" was created.`,
+        dedupeKey: `event-created:${newId}`
+      });
 
       return res.status(201).json({
         success: true,
         message: 'Event created successfully.',
-        data: populateMockEvent(newEvent, req)
+        data: eventForReadResponse(populateMockEvent(newEvent, req), req.user)
       });
     }
 
@@ -581,11 +612,18 @@ const createEvent = async (req, res, next) => {
     if (event.venue) {
       await event.populate('venue', 'name location capacity facilities hourlyRate status');
     }
+    await recordEventActivity(req, {
+      eventId: event._id,
+      actorId: req.user.id,
+      action: 'event_created',
+      description: `Event "${event.title}" was created.`,
+      dedupeKey: `event-created:${event._id}`
+    });
 
     return res.status(201).json({
       success: true,
       message: 'Event created successfully.',
-      data: event
+      data: eventForReadResponse(event, req.user)
     });
   } catch (error) {
     next(error);
@@ -643,6 +681,26 @@ const updateEvent = async (req, res, next) => {
         success: false,
         message: 'Validation failed. Please correct the highlighted errors.',
         errors
+      });
+    }
+
+    const importantFields = ['title', 'description', 'category', 'startDateTime', 'endDateTime', 'venue'];
+    const changedImportantFields = importantFields.filter((field) =>
+      sanitized[field] !== undefined &&
+      String(getReferenceId(sanitized[field])) !== String(getReferenceId(existingEvent[field]))
+    );
+    const previousStatus = existingEvent.status;
+    const completedSnapshot = getEventLifecycleStatus(existingEvent) === 'completed'
+      ? (typeof existingEvent.toObject === 'function' ? existingEvent.toObject() : { ...existingEvent })
+      : null;
+
+    if (
+      getEventLifecycleStatus(existingEvent) === 'completed' &&
+      (sanitized.startDateTime !== undefined || sanitized.endDateTime !== undefined)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'The schedule of a completed event cannot be changed.'
       });
     }
 
@@ -718,11 +776,69 @@ const updateEvent = async (req, res, next) => {
         updatedAt: new Date()
       };
       mockStore.set(id, updated);
+      const eventVersion = new Date(updated.updatedAt).getTime();
+      if (changedImportantFields.length > 0) {
+        await recordEventActivity(req, {
+          eventId: id,
+          actorId: req.user.id,
+          action: 'event_updated',
+          description: `Event "${updated.title}" was updated.`,
+          dedupeKey: `event-updated:${id}:${eventVersion}`
+        });
+        await notifyRegisteredParticipants(req, id, {
+          actorId: req.user.id,
+          type: 'event_updated',
+          title: 'Event updated',
+          message: `"${updated.title}" has important updates.`,
+          entityType: 'event',
+          entityId: id,
+          dedupeKey: `event-updated:${id}:${eventVersion}`
+        });
+      }
+      if (previousStatus !== 'published' && updated.status === 'published') {
+        await recordEventActivity(req, {
+          eventId: id,
+          actorId: req.user.id,
+          action: 'event_published',
+          description: `Event "${updated.title}" was published.`,
+          metadata: { status: 'published' },
+          dedupeKey: `event-published:${id}:${eventVersion}`
+        });
+        await notifyRegisteredParticipants(req, id, {
+          actorId: req.user.id,
+          type: 'event_published',
+          title: 'Event published',
+          message: `"${updated.title}" is now published.`,
+          entityType: 'event',
+          entityId: id,
+          dedupeKey: `event-published:${id}:${eventVersion}`
+        });
+      }
+      if (previousStatus !== 'cancelled' && updated.status === 'cancelled') {
+        await recordEventActivity(req, {
+          eventId: id,
+          actorId: req.user.id,
+          action: 'event_cancelled',
+          description: `Event "${updated.title}" was cancelled.`,
+          metadata: { status: 'cancelled' },
+          dedupeKey: `event-cancelled:${id}:${eventVersion}`
+        });
+        await notifyRegisteredParticipants(req, id, {
+          actorId: req.user.id,
+          type: 'event_cancelled',
+          title: 'Event cancelled',
+          message: `"${updated.title}" has been cancelled.`,
+          entityType: 'event',
+          entityId: id,
+          dedupeKey: `event-cancelled:${id}:${eventVersion}`
+        });
+      }
+      await recordCompletionIfDetected(req, completedSnapshot || updated);
 
       return res.status(200).json({
         success: true,
         message: 'Event updated successfully.',
-        data: populateMockEvent(updated, req)
+        data: eventForReadResponse(populateMockEvent(updated, req), req.user)
       });
     }
 
@@ -734,11 +850,69 @@ const updateEvent = async (req, res, next) => {
     if (existingEvent.venue) {
       await existingEvent.populate('venue', 'name location capacity facilities hourlyRate status');
     }
+    const eventVersion = new Date(existingEvent.updatedAt || Date.now()).getTime();
+    if (changedImportantFields.length > 0) {
+      await recordEventActivity(req, {
+        eventId: id,
+        actorId: req.user.id,
+        action: 'event_updated',
+        description: `Event "${existingEvent.title}" was updated.`,
+        dedupeKey: `event-updated:${id}:${eventVersion}`
+      });
+      await notifyRegisteredParticipants(req, id, {
+        actorId: req.user.id,
+        type: 'event_updated',
+        title: 'Event updated',
+        message: `"${existingEvent.title}" has important updates.`,
+        entityType: 'event',
+        entityId: id,
+        dedupeKey: `event-updated:${id}:${eventVersion}`
+      });
+    }
+    if (previousStatus !== 'published' && existingEvent.status === 'published') {
+      await recordEventActivity(req, {
+        eventId: id,
+        actorId: req.user.id,
+        action: 'event_published',
+        description: `Event "${existingEvent.title}" was published.`,
+        metadata: { status: 'published' },
+        dedupeKey: `event-published:${id}:${eventVersion}`
+      });
+      await notifyRegisteredParticipants(req, id, {
+        actorId: req.user.id,
+        type: 'event_published',
+        title: 'Event published',
+        message: `"${existingEvent.title}" is now published.`,
+        entityType: 'event',
+        entityId: id,
+        dedupeKey: `event-published:${id}:${eventVersion}`
+      });
+    }
+    if (previousStatus !== 'cancelled' && existingEvent.status === 'cancelled') {
+      await recordEventActivity(req, {
+        eventId: id,
+        actorId: req.user.id,
+        action: 'event_cancelled',
+        description: `Event "${existingEvent.title}" was cancelled.`,
+        metadata: { status: 'cancelled' },
+        dedupeKey: `event-cancelled:${id}:${eventVersion}`
+      });
+      await notifyRegisteredParticipants(req, id, {
+        actorId: req.user.id,
+        type: 'event_cancelled',
+        title: 'Event cancelled',
+        message: `"${existingEvent.title}" has been cancelled.`,
+        entityType: 'event',
+        entityId: id,
+        dedupeKey: `event-cancelled:${id}:${eventVersion}`
+      });
+    }
+    await recordCompletionIfDetected(req, completedSnapshot || existingEvent);
 
     return res.status(200).json({
       success: true,
       message: 'Event updated successfully.',
-      data: existingEvent
+      data: eventForReadResponse(existingEvent, req.user)
     });
   } catch (error) {
     next(error);
@@ -785,6 +959,10 @@ const updateEventStatus = async (req, res, next) => {
         message: 'Event not found.'
       });
     }
+    const previousStatus = existingEvent.status;
+    const completedSnapshot = getEventLifecycleStatus(existingEvent) === 'completed'
+      ? (typeof existingEvent.toObject === 'function' ? existingEvent.toObject() : { ...existingEvent })
+      : null;
 
     // Ownership check
     const orgId = getReferenceId(existingEvent.organizer);
@@ -838,11 +1016,38 @@ const updateEventStatus = async (req, res, next) => {
       existingEvent.status = cleanStatus;
       existingEvent.updatedAt = new Date();
       mockStore.set(id, existingEvent);
+      if (previousStatus !== cleanStatus) {
+        const eventVersion = new Date(existingEvent.updatedAt).getTime();
+        const action = cleanStatus === 'published' ? 'event_published' :
+          cleanStatus === 'cancelled' ? 'event_cancelled' : 'event_updated';
+        await recordEventActivity(req, {
+          eventId: id,
+          actorId: req.user.id,
+          action,
+          description: `Event "${existingEvent.title}" was ${cleanStatus === 'published' ? 'published' : cleanStatus === 'cancelled' ? 'cancelled' : 'returned to draft'}.`,
+          metadata: { status: cleanStatus },
+          dedupeKey: `event-status:${id}:${eventVersion}:${cleanStatus}`
+        });
+        if (cleanStatus === 'published' || cleanStatus === 'cancelled') {
+          await notifyRegisteredParticipants(req, id, {
+            actorId: req.user.id,
+            type: cleanStatus === 'published' ? 'event_published' : 'event_cancelled',
+            title: cleanStatus === 'published' ? 'Event published' : 'Event cancelled',
+            message: cleanStatus === 'published'
+              ? `"${existingEvent.title}" is now published.`
+              : `"${existingEvent.title}" has been cancelled.`,
+            entityType: 'event',
+            entityId: id,
+            dedupeKey: `event-status:${id}:${eventVersion}:${cleanStatus}`
+          });
+        }
+      }
+      await recordCompletionIfDetected(req, completedSnapshot || existingEvent);
 
       return res.status(200).json({
         success: true,
         message: `Event status successfully changed to '${cleanStatus}'.`,
-        data: populateMockEvent(existingEvent, req)
+        data: eventForReadResponse(populateMockEvent(existingEvent, req), req.user)
       });
     }
 
@@ -854,11 +1059,38 @@ const updateEventStatus = async (req, res, next) => {
     if (existingEvent.venue) {
       await existingEvent.populate('venue', 'name location capacity facilities hourlyRate status');
     }
+    if (previousStatus !== cleanStatus) {
+      const eventVersion = new Date(existingEvent.updatedAt || Date.now()).getTime();
+      const action = cleanStatus === 'published' ? 'event_published' :
+        cleanStatus === 'cancelled' ? 'event_cancelled' : 'event_updated';
+      await recordEventActivity(req, {
+        eventId: id,
+        actorId: req.user.id,
+        action,
+        description: `Event "${existingEvent.title}" was ${cleanStatus === 'published' ? 'published' : cleanStatus === 'cancelled' ? 'cancelled' : 'returned to draft'}.`,
+        metadata: { status: cleanStatus },
+        dedupeKey: `event-status:${id}:${eventVersion}:${cleanStatus}`
+      });
+      if (cleanStatus === 'published' || cleanStatus === 'cancelled') {
+        await notifyRegisteredParticipants(req, id, {
+          actorId: req.user.id,
+          type: cleanStatus === 'published' ? 'event_published' : 'event_cancelled',
+          title: cleanStatus === 'published' ? 'Event published' : 'Event cancelled',
+          message: cleanStatus === 'published'
+            ? `"${existingEvent.title}" is now published.`
+            : `"${existingEvent.title}" has been cancelled.`,
+          entityType: 'event',
+          entityId: id,
+          dedupeKey: `event-status:${id}:${eventVersion}:${cleanStatus}`
+        });
+      }
+    }
+    await recordCompletionIfDetected(req, completedSnapshot || existingEvent);
 
     return res.status(200).json({
       success: true,
       message: `Event status successfully changed to '${cleanStatus}'.`,
-      data: existingEvent
+      data: eventForReadResponse(existingEvent, req.user)
     });
   } catch (error) {
     next(error);

@@ -48,7 +48,7 @@ const getStatusBadge = (status) => {
     case 'cancelled':
       return {
         label: 'Cancelled',
-        classes: 'bg-slate-100 text-slate-600 border-slate-200',
+        classes: 'bg-surface-subtle text-text-secondary border-border',
         icon: Ban
       };
     case 'pending':
@@ -290,7 +290,7 @@ export default function AdminBookingsPage() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-xs">
+      <div className="bg-surface rounded-2xl border border-border p-6 sm:p-8 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -305,10 +305,10 @@ export default function AdminBookingsPage() {
                 </span>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
               Venue Booking Requests
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-text-muted">
               Review and approve campus venue reservations with server-backed pagination and advisory conflict detection.
             </p>
           </div>
@@ -318,7 +318,7 @@ export default function AdminBookingsPage() {
               type="button"
               onClick={handleRefresh}
               disabled={loading}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-text-secondary bg-background hover:bg-surface-subtle border border-border transition-colors disabled:opacity-50"
               title="Refresh queue and database counts"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -372,7 +372,7 @@ export default function AdminBookingsPage() {
       )}
 
       {/* Filter Tabs & Search Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-4">
+      <div className="bg-surface rounded-2xl border border-border p-4 shadow-xs space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Status Tabs with Database Totals */}
           <div className="flex flex-wrap items-center gap-2">
@@ -390,7 +390,7 @@ export default function AdminBookingsPage() {
                 className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                   activeTab === tab.id
                     ? 'bg-rose-600 text-white shadow-xs'
-                    : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70'
+                    : 'bg-surface-subtle text-text-secondary hover:bg-surface-muted'
                 }`}
                 title={`Database total: ${tab.count} ${tab.label.toLowerCase()} bookings`}
               >
@@ -398,10 +398,10 @@ export default function AdminBookingsPage() {
                 <span
                   className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                     activeTab === tab.id
-                      ? 'bg-white/20 text-white'
+                      ? 'bg-surface/20 text-white'
                       : tab.alert
                       ? 'bg-amber-100 text-amber-700'
-                      : 'bg-slate-200 text-slate-700'
+                      : 'bg-surface-muted text-text-secondary'
                   }`}
                 >
                   {tab.count}
@@ -413,19 +413,19 @@ export default function AdminBookingsPage() {
           {/* Search Box & Page Size Selector */}
           <div className="flex items-center gap-3 w-full lg:w-auto">
             <div className="relative flex-1 lg:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search event, venue, organizer..."
-                className="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-slate-50 border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-rose-500 focus:bg-white text-slate-800 transition-colors"
+                className="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-background border border-border focus:outline-hidden focus:ring-2 focus:ring-rose-500 focus:bg-surface text-text-primary transition-colors"
               />
               {searchTerm && (
                 <button
                   type="button"
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -435,7 +435,7 @@ export default function AdminBookingsPage() {
             <select
               value={pageSize}
               onChange={(e) => setPageSize(Number(e.target.value))}
-              className="py-2 px-2.5 rounded-xl text-xs bg-slate-50 border border-slate-200 text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-rose-500 shrink-0 font-medium"
+              className="py-2 px-2.5 rounded-xl text-xs bg-background border border-border text-text-secondary focus:outline-hidden focus:ring-2 focus:ring-rose-500 shrink-0 font-medium"
               title="Bookings per page"
             >
               <option value={10}>10 / page</option>
@@ -448,15 +448,15 @@ export default function AdminBookingsPage() {
 
       {/* Main Content Area */}
       {loading ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center shadow-xs">
           <Loader2 className="w-8 h-8 text-rose-600 animate-spin mx-auto mb-3" />
-          <p className="text-sm font-semibold text-slate-800">Loading booking requests...</p>
-          <p className="text-xs text-slate-500 mt-1">Fetching page {pagination.page} from database</p>
+          <p className="text-sm font-semibold text-text-primary">Loading booking requests...</p>
+          <p className="text-xs text-text-muted mt-1">Fetching page {pagination.page} from database</p>
         </div>
       ) : error ? (
-        <div className="bg-white rounded-2xl border border-rose-200 p-8 text-center shadow-xs">
+        <div className="bg-surface rounded-2xl border border-rose-200 p-8 text-center shadow-xs">
           <AlertCircle className="w-10 h-10 text-rose-500 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-900">Failed to load booking requests</h3>
+          <h3 className="text-base font-bold text-text-primary">Failed to load booking requests</h3>
           <p className="text-xs text-rose-600 mt-1 mb-4">{error}</p>
           <button
             type="button"
@@ -468,10 +468,10 @@ export default function AdminBookingsPage() {
           </button>
         </div>
       ) : filteredBookings.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
-          <CalendarCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-900">No booking requests found</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center shadow-xs">
+          <CalendarCheck className="w-12 h-12 text-text-muted mx-auto mb-3" />
+          <h3 className="text-base font-bold text-text-primary">No booking requests found</h3>
+          <p className="text-xs text-text-muted mt-1 max-w-md mx-auto">
             {searchTerm
               ? `No bookings on this page match your search query "${searchTerm}". Try resetting search or checking other pages.`
               : activeTab !== 'all'
@@ -486,7 +486,7 @@ export default function AdminBookingsPage() {
                   setSearchTerm('');
                   handleTabChange('all');
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted transition-colors"
               >
                 Reset Filters
               </button>
@@ -496,25 +496,25 @@ export default function AdminBookingsPage() {
       ) : (
         <div className="space-y-4">
           {/* Header Summary Bar with clear distinction between page items and database totals */}
-          <div className="text-xs font-medium text-slate-500 px-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="text-xs font-medium text-text-muted px-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               {searchTerm ? (
                 <span>
-                  Showing <span className="font-semibold text-slate-800">{filteredBookings.length}</span> matching
+                  Showing <span className="font-semibold text-text-primary">{filteredBookings.length}</span> matching
                   result{filteredBookings.length === 1 ? '' : 's'} on page {pagination.page} (Database total for{' '}
-                  <span className="capitalize font-semibold text-slate-700">{activeTab}</span>: {pagination.total})
+                  <span className="capitalize font-semibold text-text-secondary">{activeTab}</span>: {pagination.total})
                 </span>
               ) : (
                 <span>
-                  Showing <span className="font-semibold text-slate-800">{startItem}–{endItem}</span> of{' '}
-                  <span className="font-semibold text-slate-800">{pagination.total}</span> total{' '}
+                  Showing <span className="font-semibold text-text-primary">{startItem}–{endItem}</span> of{' '}
+                  <span className="font-semibold text-text-primary">{pagination.total}</span> total{' '}
                   <span className="capitalize">{activeTab === 'all' ? 'booking' : activeTab}</span> request
                   {pagination.total === 1 ? '' : 's'} (Page {pagination.page} of {pagination.pages})
                 </span>
               )}
             </div>
             {activeTab !== 'all' && (
-              <span className="capitalize text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md self-start sm:self-auto text-[11px]">
+              <span className="capitalize text-text-secondary bg-surface-subtle px-2 py-0.5 rounded-md self-start sm:self-auto text-[11px]">
                 Filter: {activeTab}
               </span>
             )}
@@ -536,12 +536,12 @@ export default function AdminBookingsPage() {
               return (
                 <div
                   key={bookingId}
-                  className={`bg-white rounded-2xl border transition-shadow shadow-xs hover:shadow-md overflow-hidden ${
+                  className={`bg-surface rounded-2xl border transition-shadow shadow-xs hover:shadow-md overflow-hidden ${
                     isPending
                       ? conflicts.hasApprovedConflict
                         ? 'border-amber-300/80'
-                        : 'border-slate-200/90'
-                      : 'border-slate-200/70'
+                        : 'border-border'
+                      : 'border-border'
                   }`}
                 >
                   <div className="p-5 sm:p-6 space-y-4">
@@ -556,33 +556,33 @@ export default function AdminBookingsPage() {
                             {statusBadge.label}
                           </span>
                           {booking.event?.category && (
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200 capitalize">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-subtle text-text-secondary border border-border capitalize">
                               {booking.event.category}
                             </span>
                           )}
-                          <span className="text-[11px] text-slate-400">
+                          <span className="text-[11px] text-text-muted">
                             Requested on {formatDisplayDate(booking.createdAt)}
                           </span>
                         </div>
 
-                        <h2 className="text-lg font-bold text-slate-900 leading-snug">
+                        <h2 className="text-lg font-bold text-text-primary leading-snug">
                           {booking.event?.title || 'Untitled Event'}
                         </h2>
 
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-slate-600">
-                          <div className="flex items-center gap-1 font-medium text-slate-800">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-text-secondary">
+                          <div className="flex items-center gap-1 font-medium text-text-primary">
                             <Building2 className="w-3.5 h-3.5 text-indigo-600" />
                             <span>{booking.venue?.name || 'Assigned Venue'}</span>
                           </div>
                           {booking.venue?.location && (
-                            <div className="flex items-center gap-1 text-slate-500">
-                              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                            <div className="flex items-center gap-1 text-text-muted">
+                              <MapPin className="w-3.5 h-3.5 text-text-muted" />
                               <span>{booking.venue.location}</span>
                             </div>
                           )}
                           {booking.venue?.capacity && (
-                            <div className="flex items-center gap-1 text-slate-500">
-                              <Users className="w-3.5 h-3.5 text-slate-400" />
+                            <div className="flex items-center gap-1 text-text-muted">
+                              <Users className="w-3.5 h-3.5 text-text-muted" />
                               <span>Max Capacity: {booking.venue.capacity}</span>
                             </div>
                           )}
@@ -675,49 +675,49 @@ export default function AdminBookingsPage() {
                     )}
 
                     {/* Schedule Comparison Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/70 text-xs">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3.5 bg-background rounded-xl border border-border text-xs">
                       {/* Booking Interval */}
                       <div>
-                        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                        <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1 flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-indigo-600" />
                           Requested Venue Reservation Window
                         </div>
-                        <div className="font-semibold text-slate-900">
+                        <div className="font-semibold text-text-primary">
                           {formatDisplayDate(booking.startDateTime)}
-                          <span className="text-slate-400 mx-1.5">→</span>
+                          <span className="text-text-muted mx-1.5">→</span>
                           {formatDisplayDate(booking.endDateTime)}
                         </div>
                       </div>
 
                       {/* Event Duration */}
                       <div>
-                        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                        <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1 flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-emerald-600" />
                           Associated Event Schedule
                         </div>
-                        <div className="font-semibold text-slate-900">
+                        <div className="font-semibold text-text-primary">
                           {formatDisplayDate(booking.event?.startDateTime)}
-                          <span className="text-slate-400 mx-1.5">→</span>
+                          <span className="text-text-muted mx-1.5">→</span>
                           {formatDisplayDate(booking.event?.endDateTime)}
                         </div>
                       </div>
                     </div>
 
                     {/* Organizer & Contact Information */}
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
-                      <div className="flex items-center gap-1.5 font-medium text-slate-800">
-                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 border-t border-border text-xs text-text-secondary">
+                      <div className="flex items-center gap-1.5 font-medium text-text-primary">
+                        <Users className="w-3.5 h-3.5 text-text-muted" />
                         <span>Organizer: {booking.organizer?.name || 'Platform Organizer'}</span>
                         {booking.organizer?.organization && (
-                          <span className="text-slate-500 font-normal">
+                          <span className="text-text-muted font-normal">
                             ({booking.organizer.organization})
                           </span>
                         )}
                       </div>
 
                       {booking.organizer?.email && (
-                        <div className="flex items-center gap-1.5 text-slate-500">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
+                        <div className="flex items-center gap-1.5 text-text-muted">
+                          <Mail className="w-3.5 h-3.5 text-text-muted" />
                           <a
                             href={`mailto:${booking.organizer.email}`}
                             className="hover:text-indigo-600 transition-colors"
@@ -728,8 +728,8 @@ export default function AdminBookingsPage() {
                       )}
 
                       {booking.organizer?.phone && (
-                        <div className="flex items-center gap-1.5 text-slate-500">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
+                        <div className="flex items-center gap-1.5 text-text-muted">
+                          <Phone className="w-3.5 h-3.5 text-text-muted" />
                           <span>{booking.organizer.phone}</span>
                         </div>
                       )}
@@ -737,11 +737,11 @@ export default function AdminBookingsPage() {
 
                     {/* Purpose / Booking Notes */}
                     {(booking.purpose || booking.notes) && (
-                      <div className="text-xs bg-white p-3 rounded-xl border border-slate-200/80">
-                        <div className="text-[11px] font-bold text-slate-500 mb-0.5">
+                      <div className="text-xs bg-surface p-3 rounded-xl border border-border">
+                        <div className="text-[11px] font-bold text-text-muted mb-0.5">
                           Purpose & Logistical Notes:
                         </div>
-                        <div className="text-slate-700 whitespace-pre-wrap leading-relaxed">
+                        <div className="text-text-secondary whitespace-pre-wrap leading-relaxed">
                           {booking.purpose || booking.notes}
                         </div>
                       </div>
@@ -762,11 +762,11 @@ export default function AdminBookingsPage() {
 
                     {/* Audit Metadata (Reviewer & ReviewedAt) */}
                     {booking.reviewedAt && (
-                      <div className="text-[11px] text-slate-400 flex items-center gap-2 pt-1">
-                        <Shield className="w-3 h-3 text-slate-400" />
+                      <div className="text-[11px] text-text-muted flex items-center gap-2 pt-1">
+                        <Shield className="w-3 h-3 text-text-muted" />
                         <span>
                           Reviewed by{' '}
-                          <span className="font-semibold text-slate-600">
+                          <span className="font-semibold text-text-secondary">
                             {booking.reviewedBy?.name || 'Administrator'}
                           </span>{' '}
                           on {formatDisplayDate(booking.reviewedAt)}
@@ -781,10 +781,10 @@ export default function AdminBookingsPage() {
 
           {/* Server-Side Pagination Footer */}
           {pagination.pages > 1 && (
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
+            <div className="bg-surface rounded-2xl border border-border p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-text-secondary">
               <div>
-                Showing page <span className="font-semibold text-slate-900">{pagination.page}</span> of{' '}
-                <span className="font-semibold text-slate-900">{pagination.pages}</span> ({pagination.total} total
+                Showing page <span className="font-semibold text-text-primary">{pagination.page}</span> of{' '}
+                <span className="font-semibold text-text-primary">{pagination.pages}</span> ({pagination.total} total
                 records in database)
               </div>
 
@@ -793,7 +793,7 @@ export default function AdminBookingsPage() {
                   type="button"
                   disabled={pagination.page <= 1 || loading}
                   onClick={() => handlePageChange(pagination.page - 1)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-2xs"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface font-medium hover:bg-background disabled:opacity-50 transition-colors shadow-2xs"
                   aria-label="Previous page"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
@@ -814,7 +814,7 @@ export default function AdminBookingsPage() {
                       return (
                         <React.Fragment key={pageNum}>
                           {prev && pageNum - prev > 1 && (
-                            <span className="text-slate-400 px-1 select-none">...</span>
+                            <span className="text-text-muted px-1 select-none">...</span>
                           )}
                           <button
                             type="button"
@@ -823,7 +823,7 @@ export default function AdminBookingsPage() {
                             className={`min-w-7 h-7 px-2 rounded-lg font-bold text-xs transition-colors ${
                               pagination.page === pageNum
                                 ? 'bg-rose-600 text-white shadow-2xs'
-                                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+                                : 'bg-background text-text-secondary hover:bg-surface-subtle border border-border'
                             }`}
                           >
                             {pageNum}
@@ -837,7 +837,7 @@ export default function AdminBookingsPage() {
                   type="button"
                   disabled={pagination.page >= pagination.pages || loading}
                   onClick={() => handlePageChange(pagination.page + 1)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-2xs"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface font-medium hover:bg-background disabled:opacity-50 transition-colors shadow-2xs"
                   aria-label="Next page"
                 >
                   <span>Next</span>
@@ -851,18 +851,18 @@ export default function AdminBookingsPage() {
 
       {/* Reject Booking Dialog Modal */}
       {rejectionTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50 backdrop-blur-xs">
+          <div className="bg-surface rounded-2xl max-w-lg w-full p-6 shadow-xl border border-border space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
                   <XCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-text-primary">
                     Reject Venue Booking Request
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-text-muted">
                     Provide a mandatory reason for declining this request.
                   </p>
                 </div>
@@ -871,23 +871,23 @@ export default function AdminBookingsPage() {
                 type="button"
                 onClick={closeRejectionDialog}
                 disabled={rejectionSubmitting}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-text-muted hover:text-text-secondary p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Target Summary */}
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
-              <div className="font-bold text-slate-900">
+            <div className="p-3.5 bg-background rounded-xl border border-border text-xs space-y-1">
+              <div className="font-bold text-text-primary">
                 {rejectionTarget.event?.title || 'Event'}
               </div>
-              <div className="text-slate-600 flex items-center gap-2">
+              <div className="text-text-secondary flex items-center gap-2">
                 <span>Venue: {rejectionTarget.venue?.name || 'Venue'}</span>
                 <span>•</span>
                 <span>Organizer: {rejectionTarget.organizer?.name || 'Organizer'}</span>
               </div>
-              <div className="text-slate-500">
+              <div className="text-text-muted">
                 Requested: {formatDisplayDate(rejectionTarget.startDateTime)} – {formatDisplayDate(rejectionTarget.endDateTime)}
               </div>
             </div>
@@ -895,7 +895,7 @@ export default function AdminBookingsPage() {
             {/* Form */}
             <form onSubmit={handleConfirmRejection} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-text-secondary mb-1">
                   Rejection Reason <span className="text-rose-500">*</span>
                 </label>
                 <textarea
@@ -907,8 +907,8 @@ export default function AdminBookingsPage() {
                   }}
                   maxLength={1000}
                   placeholder="Explain why this request is being rejected (e.g., Campus auditorium is reserved for institutional convocation; facility maintenance scheduled)..."
-                  className={`w-full p-3 rounded-xl text-xs bg-slate-50 border focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-rose-500 text-slate-900 ${
-                    rejectionError ? 'border-rose-300 ring-1 ring-rose-200' : 'border-slate-200'
+                  className={`w-full p-3 rounded-xl text-xs bg-background border focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-rose-500 text-text-primary ${
+                    rejectionError ? 'border-rose-300 ring-1 ring-rose-200' : 'border-border'
                   }`}
                   disabled={rejectionSubmitting}
                 />
@@ -916,7 +916,7 @@ export default function AdminBookingsPage() {
                   <span className="text-rose-600 font-medium">{rejectionError}</span>
                   <span
                     className={`${
-                      rejectionReason.length > 950 ? 'text-amber-600 font-semibold' : 'text-slate-400'
+                      rejectionReason.length > 950 ? 'text-amber-600 font-semibold' : 'text-text-muted'
                     }`}
                   >
                     {rejectionReason.length} / 1000 characters
@@ -925,12 +925,12 @@ export default function AdminBookingsPage() {
               </div>
 
               {/* Dialog Actions */}
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
                 <button
                   type="button"
                   onClick={closeRejectionDialog}
                   disabled={rejectionSubmitting}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>

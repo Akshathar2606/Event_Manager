@@ -252,7 +252,7 @@ export default function AdminVenuesPage() {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+      <div className="bg-surface rounded-2xl border border-border p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -261,10 +261,10 @@ export default function AdminVenuesPage() {
                 Administrative Facility Control
               </span>
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-extrabold text-text-primary tracking-tight">
               Campus Venues Management
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-text-muted">
               Register, update, and manage institutional venues, auditoriums, and seminar halls
             </p>
           </div>
@@ -305,11 +305,11 @@ export default function AdminVenuesPage() {
       )}
 
       {/* Filters & Search Toolbar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+      <div className="bg-surface rounded-2xl border border-border p-4 shadow-xs">
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {/* Search Input */}
           <div className="sm:col-span-2 relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
               <Search className="w-4 h-4" />
             </div>
             <input
@@ -317,7 +317,7 @@ export default function AdminVenuesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by venue name or location..."
-              className="block w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
+              className="block w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-border bg-surface placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
             />
           </div>
 
@@ -326,7 +326,7 @@ export default function AdminVenuesPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="block w-full py-2 px-3 text-sm rounded-xl border border-slate-200 bg-white text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
+              className="block w-full py-2 px-3 text-sm rounded-xl border border-border bg-surface text-text-secondary focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
             >
               <option value="">All Statuses</option>
               <option value="available">Available Only</option>
@@ -339,7 +339,7 @@ export default function AdminVenuesPage() {
             <select
               value={facilityFilter}
               onChange={(e) => setFacilityFilter(e.target.value)}
-              className="block w-full py-2 px-3 text-sm rounded-xl border border-slate-200 bg-white text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
+              className="block w-full py-2 px-3 text-sm rounded-xl border border-border bg-surface text-text-secondary focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
             >
               <option value="">All Facilities</option>
               {COMMON_FACILITIES.map((f) => (
@@ -353,19 +353,19 @@ export default function AdminVenuesPage() {
       </div>
 
       {/* Venues Table / Grid */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden">
         {loading ? (
-          <div className="py-16 flex flex-col items-center justify-center text-slate-400">
+          <div className="py-16 flex flex-col items-center justify-center text-text-muted">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-2" />
             <p className="text-sm">Loading campus venues...</p>
           </div>
         ) : venues.length === 0 ? (
           <div className="py-16 px-4 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-surface-subtle text-text-muted flex items-center justify-center mx-auto mb-3">
               <Building2 className="w-6 h-6" />
             </div>
-            <h3 className="font-semibold text-slate-800 text-base">No venues found</h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            <h3 className="font-semibold text-text-primary text-base">No venues found</h3>
+            <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
               {search || statusFilter || facilityFilter
                 ? 'No venues match your selected filters. Try clearing search parameters.'
                 : 'No campus venues have been added yet. Click "Add Venue" to register your first location.'}
@@ -388,7 +388,7 @@ export default function AdminVenuesPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <tr className="border-b border-border bg-background text-[11px] font-semibold text-text-muted uppercase tracking-wider">
                   <th className="py-3.5 px-4 sm:px-6">Venue Name & Location</th>
                   <th className="py-3.5 px-4">Capacity</th>
                   <th className="py-3.5 px-4">Rate / Hour</th>
@@ -401,13 +401,13 @@ export default function AdminVenuesPage() {
                 {venues.map((venue) => {
                   const isActionBusy = actionLoading === venue.id;
                   return (
-                    <tr key={venue.id} className="hover:bg-slate-50/60 transition-colors">
+                    <tr key={venue.id} className="hover:bg-background transition-colors">
                       {/* Name & Location */}
                       <td className="py-4 px-4 sm:px-6">
-                        <div className="font-semibold text-slate-900">{venue.name}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{venue.location}</div>
+                        <div className="font-semibold text-text-primary">{venue.name}</div>
+                        <div className="text-xs text-text-muted mt-0.5">{venue.location}</div>
                         {venue.description && (
-                          <div className="text-[11px] text-slate-400 mt-1 line-clamp-1">
+                          <div className="text-[11px] text-text-muted mt-1 line-clamp-1">
                             {venue.description}
                           </div>
                         )}
@@ -415,15 +415,15 @@ export default function AdminVenuesPage() {
 
                       {/* Capacity */}
                       <td className="py-4 px-4">
-                        <div className="inline-flex items-center gap-1.5 font-medium text-slate-700">
-                          <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <div className="inline-flex items-center gap-1.5 font-medium text-text-secondary">
+                          <Users className="w-3.5 h-3.5 text-text-muted" />
                           <span>{venue.capacity.toLocaleString()} seats</span>
                         </div>
                       </td>
 
                       {/* Hourly Rate */}
                       <td className="py-4 px-4">
-                        <span className="font-medium text-slate-700">
+                        <span className="font-medium text-text-secondary">
                           {venue.hourlyRate > 0 ? `$${venue.hourlyRate}/hr` : 'Free / Included'}
                         </span>
                       </td>
@@ -434,13 +434,13 @@ export default function AdminVenuesPage() {
                           {(venue.facilities || []).slice(0, 3).map((f) => (
                             <span
                               key={f}
-                              className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px]"
+                              className="inline-block px-2 py-0.5 rounded-md bg-surface-subtle text-text-secondary text-[11px]"
                             >
                               {f}
                             </span>
                           ))}
                           {(venue.facilities || []).length > 3 && (
-                            <span className="inline-block px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 text-[10px] font-medium">
+                            <span className="inline-block px-1.5 py-0.5 rounded-md bg-background text-text-muted text-[10px] font-medium">
                               +{venue.facilities.length - 3} more
                             </span>
                           )}
@@ -472,7 +472,7 @@ export default function AdminVenuesPage() {
                             type="button"
                             disabled={isActionBusy}
                             onClick={() => openEditModal(venue)}
-                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-1.5 text-text-muted hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                             title="Edit Venue"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -482,7 +482,7 @@ export default function AdminVenuesPage() {
                             type="button"
                             disabled={isActionBusy}
                             onClick={() => setArchiveTarget(venue)}
-                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="p-1.5 text-text-muted hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                             title="Archive Venue"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -499,17 +499,17 @@ export default function AdminVenuesPage() {
 
         {/* Pagination Footer */}
         {pagination.pages > 1 && (
-          <div className="py-3 px-6 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500">
+          <div className="py-3 px-6 border-t border-border bg-background flex items-center justify-between text-xs text-text-muted">
             <div>
-              Showing page <span className="font-semibold text-slate-700">{pagination.page}</span> of{' '}
-              <span className="font-semibold text-slate-700">{pagination.pages}</span> ({pagination.total} total)
+              Showing page <span className="font-semibold text-text-secondary">{pagination.page}</span> of{' '}
+              <span className="font-semibold text-text-secondary">{pagination.pages}</span> ({pagination.total} total)
             </div>
             <div className="flex gap-1">
               <button
                 type="button"
                 disabled={pagination.page <= 1 || loading}
                 onClick={() => fetchVenues(pagination.page - 1)}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white font-medium hover:bg-slate-50 disabled:opacity-50"
+                className="px-2.5 py-1 rounded-lg border border-border bg-surface font-medium hover:bg-background disabled:opacity-50"
               >
                 Previous
               </button>
@@ -517,7 +517,7 @@ export default function AdminVenuesPage() {
                 type="button"
                 disabled={pagination.page >= pagination.pages || loading}
                 onClick={() => fetchVenues(pagination.page + 1)}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white font-medium hover:bg-slate-50 disabled:opacity-50"
+                className="px-2.5 py-1 rounded-lg border border-border bg-surface font-medium hover:bg-background disabled:opacity-50"
               >
                 Next
               </button>
@@ -528,21 +528,21 @@ export default function AdminVenuesPage() {
 
       {/* Add / Edit Venue Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 sm:p-8 animate-fadeIn">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-xl w-full p-6 sm:p-8 animate-fadeIn">
+            <div className="flex items-center justify-between pb-4 border-b border-border">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
                   <Building2 className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-lg text-slate-900">
+                <h3 className="font-bold text-lg text-text-primary">
                   {modalMode === 'create' ? 'Register New Campus Venue' : `Edit "${activeVenue?.name}"`}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-text-muted hover:text-text-secondary p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -551,7 +551,7 @@ export default function AdminVenuesPage() {
             <form onSubmit={handleFormSubmit} className="mt-5 space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
                   Venue Name *
                 </label>
                 <input
@@ -559,8 +559,8 @@ export default function AdminVenuesPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. University Grand Auditorium"
-                  className={`block w-full px-3 py-2 text-sm rounded-xl border bg-white ${
-                    formErrors.name ? 'border-rose-400 focus:ring-rose-200' : 'border-slate-200 focus:ring-indigo-100'
+                  className={`block w-full px-3 py-2 text-sm rounded-xl border bg-surface ${
+                    formErrors.name ? 'border-rose-400 focus:ring-rose-200' : 'border-border focus:ring-indigo-100'
                   } focus:outline-hidden focus:ring-2 focus:border-indigo-600`}
                 />
                 {formErrors.name && (
@@ -570,7 +570,7 @@ export default function AdminVenuesPage() {
 
               {/* Location */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
                   Location / Building / Room *
                 </label>
                 <input
@@ -578,8 +578,8 @@ export default function AdminVenuesPage() {
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   placeholder="e.g. Academic Block C, 3rd Floor"
-                  className={`block w-full px-3 py-2 text-sm rounded-xl border bg-white ${
-                    formErrors.location ? 'border-rose-400 focus:ring-rose-200' : 'border-slate-200 focus:ring-indigo-100'
+                  className={`block w-full px-3 py-2 text-sm rounded-xl border bg-surface ${
+                    formErrors.location ? 'border-rose-400 focus:ring-rose-200' : 'border-border focus:ring-indigo-100'
                   } focus:outline-hidden focus:ring-2 focus:border-indigo-600`}
                 />
                 {formErrors.location && (
@@ -590,7 +590,7 @@ export default function AdminVenuesPage() {
               {/* Capacity and Rate in Two Columns */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
                     Seating Capacity *
                   </label>
                   <input
@@ -599,8 +599,8 @@ export default function AdminVenuesPage() {
                     value={formData.capacity}
                     onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
                     placeholder="e.g. 250"
-                    className={`block w-full px-3 py-2 text-sm rounded-xl border bg-white ${
-                      formErrors.capacity ? 'border-rose-400 focus:ring-rose-200' : 'border-slate-200 focus:ring-indigo-100'
+                    className={`block w-full px-3 py-2 text-sm rounded-xl border bg-surface ${
+                      formErrors.capacity ? 'border-rose-400 focus:ring-rose-200' : 'border-border focus:ring-indigo-100'
                     } focus:outline-hidden focus:ring-2 focus:border-indigo-600`}
                   />
                   {formErrors.capacity && (
@@ -609,8 +609,8 @@ export default function AdminVenuesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Hourly Fee ($) <span className="text-slate-400 font-normal lowercase">(0 if free)</span>
+                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                    Hourly Fee ($) <span className="text-text-muted font-normal lowercase">(0 if free)</span>
                   </label>
                   <input
                     type="number"
@@ -619,7 +619,7 @@ export default function AdminVenuesPage() {
                     value={formData.hourlyRate}
                     onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
                     placeholder="0"
-                    className="block w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
+                    className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
                   />
                   {formErrors.hourlyRate && (
                     <p className="mt-1 text-xs text-rose-600 font-medium">{formErrors.hourlyRate}</p>
@@ -629,13 +629,13 @@ export default function AdminVenuesPage() {
 
               {/* Status */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
                   Initial Status
                 </label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="block w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
+                  className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface text-text-secondary focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
                 >
                   <option value="available">Available for Bookings</option>
                   <option value="maintenance">Under Maintenance</option>
@@ -644,21 +644,21 @@ export default function AdminVenuesPage() {
 
               {/* Description */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Description <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                  Description <span className="text-text-muted font-normal lowercase">(optional)</span>
                 </label>
                 <textarea
                   rows="2"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Key features, acoustics, accessibility notes..."
-                  className="block w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
+                  className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
                 />
               </div>
 
               {/* Facilities Selector */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
                   Available Facilities & Equipment
                 </label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -672,7 +672,7 @@ export default function AdminVenuesPage() {
                         className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
                           isSelected
                             ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            : 'bg-background text-text-secondary border-border hover:bg-surface-subtle'
                         }`}
                       >
                         {isSelected ? '✓ ' : '+ '}
@@ -689,12 +689,12 @@ export default function AdminVenuesPage() {
                     value={customFacility}
                     onChange={(e) => setCustomFacility(e.target.value)}
                     placeholder="Add custom facility (e.g. Grand Piano)..."
-                    className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white"
+                    className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-border bg-surface"
                   />
                   <button
                     type="button"
                     onClick={addCustomFacility}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface-subtle hover:bg-surface-muted text-text-secondary"
                   >
                     Add
                   </button>
@@ -702,11 +702,11 @@ export default function AdminVenuesPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+              <div className="pt-4 border-t border-border flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface-subtle rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
@@ -726,17 +726,17 @@ export default function AdminVenuesPage() {
 
       {/* Safe Archive Confirmation Modal */}
       {archiveTarget && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 text-center animate-fadeIn">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-md w-full p-6 text-center animate-fadeIn">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto mb-3">
               <AlertTriangle className="w-6 h-6" />
             </div>
 
-            <h3 className="font-bold text-lg text-slate-900">Archive Campus Venue?</h3>
-            <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-              Are you sure you want to archive <span className="font-semibold text-slate-800">"{archiveTarget.name}"</span>?
+            <h3 className="font-bold text-lg text-text-primary">Archive Campus Venue?</h3>
+            <p className="text-xs text-text-muted mt-2 leading-relaxed">
+              Are you sure you want to archive <span className="font-semibold text-text-primary">"{archiveTarget.name}"</span>?
               <br />
-              <span className="text-slate-400">
+              <span className="text-text-muted">
                 To preserve historical event and booking references, this venue will be flagged as archived and hidden from organizers.
               </span>
             </p>
@@ -745,7 +745,7 @@ export default function AdminVenuesPage() {
               <button
                 type="button"
                 onClick={() => setArchiveTarget(null)}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface-subtle rounded-xl transition-colors"
               >
                 Cancel
               </button>

@@ -147,7 +147,7 @@ export default function VendorCateringRequestsPage() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+      <div className="bg-surface rounded-2xl border border-border p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -156,10 +156,10 @@ export default function VendorCateringRequestsPage() {
                 Vendor Dispatch
               </span>
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-extrabold text-text-primary tracking-tight">
               Incoming Catering Requests
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-text-muted">
               Review catering proposals from campus organizers, verify headcounts, and accept or reject service agreements.
             </p>
           </div>
@@ -168,7 +168,7 @@ export default function VendorCateringRequestsPage() {
             <button
               type="button"
               onClick={() => fetchRequests(pagination.page)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-surface text-xs font-semibold text-text-secondary hover:bg-background transition-colors shadow-2xs"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Refresh Queue</span>
@@ -206,7 +206,7 @@ export default function VendorCateringRequestsPage() {
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap shrink-0 ${
                 isActive
                   ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  : 'bg-surface text-text-secondary border-border hover:bg-background'
               }`}
             >
               {tab.label}
@@ -217,17 +217,17 @@ export default function VendorCateringRequestsPage() {
 
       {/* Requests List */}
       {loading ? (
-        <div className="py-20 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center text-slate-400">
+        <div className="py-20 bg-surface rounded-2xl border border-border shadow-xs flex flex-col items-center justify-center text-text-muted">
           <Loader2 className="w-8 h-8 animate-spin text-amber-600 mb-2" />
           <p className="text-sm font-medium">Loading incoming requests...</p>
         </div>
       ) : requests.length === 0 ? (
-        <div className="py-16 px-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs text-center">
+        <div className="py-16 px-4 bg-surface rounded-2xl border border-border shadow-xs text-center">
           <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-3">
             <ClipboardList className="w-6 h-6" />
           </div>
-          <h3 className="font-semibold text-slate-800 text-base">No catering requests found</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          <h3 className="font-semibold text-text-primary text-base">No catering requests found</h3>
+          <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
             {activeStatus
               ? `You have no ${activeStatus} catering proposals in your queue.`
               : 'You have no incoming catering proposals at this time.'}
@@ -242,7 +242,7 @@ export default function VendorCateringRequestsPage() {
             return (
               <div
                 key={req.id || req._id}
-                className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between"
+                className="bg-surface rounded-2xl border border-border p-5 sm:p-6 shadow-xs hover:border-border-strong transition-all flex flex-col justify-between"
               >
                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                   {/* Left: Event & Organizer Info */}
@@ -256,44 +256,44 @@ export default function VendorCateringRequestsPage() {
                       </span>
 
                       {req.event?.category && (
-                        <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 capitalize">
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-subtle text-text-secondary capitalize">
                           {req.event.category}
                         </span>
                       )}
 
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-[11px] text-text-muted">
                         Received: {formatDisplayDateTime(req.createdAt)}
                       </span>
                     </div>
 
-                    <h3 className="font-bold text-slate-900 text-lg leading-snug">
+                    <h3 className="font-bold text-text-primary text-lg leading-snug">
                       {req.event?.title || 'Campus Event Proposal'}
                     </h3>
 
                     {/* Organizer details */}
-                    <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-600">
+                    <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-text-secondary">
                       <div className="flex items-center gap-1">
                         <Users className="w-3.5 h-3.5 text-indigo-500" />
                         <span>Organizer: <strong>{req.organizer?.name || 'Authorized Organizer'}</strong></span>
                       </div>
 
                       {req.organizer?.organization && (
-                        <div className="flex items-center gap-1 text-slate-500">
-                          <Building className="w-3.5 h-3.5 text-slate-400" />
+                        <div className="flex items-center gap-1 text-text-muted">
+                          <Building className="w-3.5 h-3.5 text-text-muted" />
                           <span>{req.organizer.organization}</span>
                         </div>
                       )}
 
                       {req.organizer?.email && (
-                        <div className="flex items-center gap-1 text-slate-500">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
+                        <div className="flex items-center gap-1 text-text-muted">
+                          <Mail className="w-3.5 h-3.5 text-text-muted" />
                           <span>{req.organizer.email}</span>
                         </div>
                       )}
                     </div>
 
                     {/* Service schedule */}
-                    <div className="flex items-center gap-1 text-xs text-slate-500">
+                    <div className="flex items-center gap-1 text-xs text-text-muted">
                       <Calendar className="w-3.5 h-3.5 text-amber-600" />
                       <span>Delivery Target: <strong>{formatDisplayDateTime(req.serviceDateTime || req.event?.startDateTime)}</strong></span>
                     </div>
@@ -310,10 +310,10 @@ export default function VendorCateringRequestsPage() {
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-semibold text-slate-800 block">
+                      <span className="text-xs font-semibold text-text-primary block">
                         {req.guestCount} Attendees (${req.pricePerPlate}/plate)
                       </span>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="text-[11px] text-text-muted">
                         Menu: {req.selectedPackage?.name}
                       </span>
                     </div>
@@ -322,8 +322,8 @@ export default function VendorCateringRequestsPage() {
 
                 {/* Organizer notes */}
                 {req.notes && (
-                  <div className="mt-3.5 p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-700">
-                    <strong className="font-semibold block text-[11px] text-slate-500 uppercase mb-0.5">
+                  <div className="mt-3.5 p-3 rounded-xl bg-background border border-border text-xs text-text-secondary">
+                    <strong className="font-semibold block text-[11px] text-text-muted uppercase mb-0.5">
                       Organizer Setup Requirements:
                     </strong>
                     <p>"{req.notes}"</p>
@@ -336,7 +336,7 @@ export default function VendorCateringRequestsPage() {
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
                       <span className="font-semibold">You accepted this catering contract on {formatDisplayDateTime(req.respondedAt || req.updatedAt)}</span>
-                      {req.vendorNotes && <p className="mt-0.5 text-slate-700">Notes provided: "{req.vendorNotes}"</p>}
+                      {req.vendorNotes && <p className="mt-0.5 text-text-secondary">Notes provided: "{req.vendorNotes}"</p>}
                     </div>
                   </div>
                 )}
@@ -352,20 +352,20 @@ export default function VendorCateringRequestsPage() {
                 )}
 
                 {req.status === 'cancelled' && (
-                  <div className="mt-3.5 p-3 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-600 flex items-start gap-2">
-                    <Ban className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                  <div className="mt-3.5 p-3 rounded-xl bg-surface-subtle border border-border text-xs text-text-secondary flex items-start gap-2">
+                    <Ban className="w-4 h-4 text-text-muted shrink-0 mt-0.5" />
                     <div>
                       <span>Cancelled by Organizer on {formatDisplayDateTime(req.cancelledAt || req.updatedAt)}</span>
                       {req.cancellationReason && (
-                        <p className="mt-0.5 italic text-slate-500">Reason: "{req.cancellationReason}"</p>
+                        <p className="mt-0.5 italic text-text-muted">Reason: "{req.cancellationReason}"</p>
                       )}
                     </div>
                   </div>
                 )}
 
                 {/* Bottom Row Actions */}
-                <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-[11px] text-slate-400">
+                <div className="mt-4 pt-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-[11px] text-text-muted">
                     Min order required: {req.selectedPackage?.minOrder} attendees
                   </span>
 
@@ -373,7 +373,7 @@ export default function VendorCateringRequestsPage() {
                     <button
                       type="button"
                       onClick={() => setSelectedRequest(req)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Details</span>
@@ -420,7 +420,7 @@ export default function VendorCateringRequestsPage() {
 
       {/* Pagination Controls */}
       {pagination.pages > 1 && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs flex items-center justify-between text-xs text-slate-500">
+        <div className="bg-surface rounded-2xl border border-border p-4 shadow-xs flex items-center justify-between text-xs text-text-muted">
           <div>
             Showing Page <strong>{pagination.page}</strong> of <strong>{pagination.pages}</strong> ({pagination.total} incoming proposals)
           </div>
@@ -429,7 +429,7 @@ export default function VendorCateringRequestsPage() {
               type="button"
               disabled={pagination.page <= 1 || loading}
               onClick={() => fetchRequests(pagination.page - 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-background disabled:opacity-40"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               <span>Previous</span>
@@ -438,7 +438,7 @@ export default function VendorCateringRequestsPage() {
               type="button"
               disabled={pagination.page >= pagination.pages || loading}
               onClick={() => fetchRequests(pagination.page + 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-background disabled:opacity-40"
             >
               <span>Next</span>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -449,19 +449,19 @@ export default function VendorCateringRequestsPage() {
 
       {/* Accept Confirmation Modal */}
       {acceptingRequest && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 sm:p-7 animate-fadeIn">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-md w-full p-6 sm:p-7 animate-fadeIn">
             <div className="flex items-center gap-3 text-emerald-600 mb-3">
               <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center border border-emerald-200 shrink-0">
                 <Check className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Accept Catering Proposal?</h3>
-                <p className="text-xs text-slate-500">Event: {acceptingRequest.event?.title}</p>
+                <h3 className="font-bold text-text-primary text-base">Accept Catering Proposal?</h3>
+                <p className="text-xs text-text-muted">Event: {acceptingRequest.event?.title}</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed mb-3">
+            <p className="text-xs text-text-secondary leading-relaxed mb-3">
               You are confirming catering services for <strong>{acceptingRequest.guestCount} guests</strong> with a total value of{' '}
               <strong className="text-emerald-700">${Number(acceptingRequest.quotedPrice).toFixed(2)}</strong>.
             </p>
@@ -475,8 +475,8 @@ export default function VendorCateringRequestsPage() {
 
             <form onSubmit={handleConfirmAccept} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Vendor Arrival & Banquet Setup Notes <span className="text-slate-400 lowercase font-normal">(optional)</span>
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                  Vendor Arrival & Banquet Setup Notes <span className="text-text-muted lowercase font-normal">(optional)</span>
                 </label>
                 <textarea
                   rows="3"
@@ -484,7 +484,7 @@ export default function VendorCateringRequestsPage() {
                   value={acceptNotes}
                   onChange={(e) => setAcceptNotes(e.target.value)}
                   placeholder="e.g., We will arrive at 08:00 AM with warming trays. Please have tables ready near the south entrance..."
-                  className="block w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600"
+                  className="block w-full px-3 py-2 text-xs rounded-xl border border-border focus:outline-hidden focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600"
                 />
               </div>
 
@@ -493,7 +493,7 @@ export default function VendorCateringRequestsPage() {
                   type="button"
                   disabled={acceptSubmitting}
                   onClick={() => setAcceptingRequest(null)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted rounded-xl disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -522,19 +522,19 @@ export default function VendorCateringRequestsPage() {
 
       {/* Reject Modal */}
       {rejectingRequest && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 sm:p-7 animate-fadeIn">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-md w-full p-6 sm:p-7 animate-fadeIn">
             <div className="flex items-center gap-3 text-rose-600 mb-3">
               <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center border border-rose-200 shrink-0">
                 <XCircle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Decline Catering Proposal</h3>
-                <p className="text-xs text-slate-500">Event: {rejectingRequest.event?.title}</p>
+                <h3 className="font-bold text-text-primary text-base">Decline Catering Proposal</h3>
+                <p className="text-xs text-text-muted">Event: {rejectingRequest.event?.title}</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed mb-3">
+            <p className="text-xs text-text-secondary leading-relaxed mb-3">
               Declining this proposal is permanent. You must provide a clear explanation to the event organizer.
             </p>
 
@@ -555,10 +555,10 @@ export default function VendorCateringRequestsPage() {
             <form onSubmit={handleConfirmReject} className="space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
                     Rejection Reason <span className="text-rose-500">*</span>
                   </label>
-                  <span className="text-[11px] text-slate-400">{rejectionReason.length}/1000</span>
+                  <span className="text-[11px] text-text-muted">{rejectionReason.length}/1000</span>
                 </div>
                 <textarea
                   rows="3"
@@ -570,13 +570,13 @@ export default function VendorCateringRequestsPage() {
                     if (rejectionValidationError) setRejectionValidationError(null);
                   }}
                   placeholder="e.g., Kitchen fully booked for campus conference on this date; cannot supply dietary requirements..."
-                  className="block w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-rose-100 focus:border-rose-600"
+                  className="block w-full px-3 py-2 text-xs rounded-xl border border-border focus:outline-hidden focus:ring-2 focus:ring-rose-100 focus:border-rose-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Additional Notes <span className="text-slate-400 lowercase font-normal">(optional)</span>
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                  Additional Notes <span className="text-text-muted lowercase font-normal">(optional)</span>
                 </label>
                 <textarea
                   rows="2"
@@ -584,7 +584,7 @@ export default function VendorCateringRequestsPage() {
                   value={rejectNotes}
                   onChange={(e) => setRejectNotes(e.target.value)}
                   placeholder="Optional recommendations, alternative dates or referral..."
-                  className="block w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-slate-100 focus:border-slate-400"
+                  className="block w-full px-3 py-2 text-xs rounded-xl border border-border focus:outline-hidden focus:ring-2 focus:ring-slate-100 focus:border-border-strong"
                 />
               </div>
 
@@ -593,7 +593,7 @@ export default function VendorCateringRequestsPage() {
                   type="button"
                   disabled={rejectSubmitting}
                   onClick={() => setRejectingRequest(null)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted rounded-xl disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -622,76 +622,76 @@ export default function VendorCateringRequestsPage() {
 
       {/* Detail Modal */}
       {selectedRequest && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-2xl w-full p-6 sm:p-8 animate-fadeIn max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-2xl w-full p-6 sm:p-8 animate-fadeIn max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-slate-100 shrink-0">
+            <div className="flex items-start justify-between pb-4 border-b border-border shrink-0">
               <div>
                 <span
                   className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border mb-1 ${getCateringRequestStatusBadge(selectedRequest.status).classes}`}
                 >
                   {getCateringRequestStatusBadge(selectedRequest.status).label}
                 </span>
-                <h3 className="font-extrabold text-xl text-slate-900">
+                <h3 className="font-extrabold text-xl text-text-primary">
                   {selectedRequest.event?.title || 'Campus Event Proposal'}
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-text-muted mt-0.5">
                   Request ID: <span className="font-mono">{selectedRequest.id || selectedRequest._id}</span>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedRequest(null)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-text-muted hover:text-text-secondary p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Scrollable Content */}
-            <div className="py-5 overflow-y-auto space-y-5 text-sm text-slate-600 pr-1">
+            <div className="py-5 overflow-y-auto space-y-5 text-sm text-text-secondary pr-1">
               {/* Event & Organizer Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-background rounded-xl border border-border text-xs">
                 <div>
-                  <span className="text-slate-400 block font-semibold uppercase text-[10px]">Client / Organizer</span>
-                  <span className="font-bold text-slate-800 text-sm">{selectedRequest.organizer?.name}</span>
+                  <span className="text-text-muted block font-semibold uppercase text-[10px]">Client / Organizer</span>
+                  <span className="font-bold text-text-primary text-sm">{selectedRequest.organizer?.name}</span>
                   {selectedRequest.organizer?.organization && (
-                    <span className="text-slate-600 block">{selectedRequest.organizer.organization}</span>
+                    <span className="text-text-secondary block">{selectedRequest.organizer.organization}</span>
                   )}
                   {selectedRequest.organizer?.email && (
-                    <span className="text-slate-500 block">Email: {selectedRequest.organizer.email}</span>
+                    <span className="text-text-muted block">Email: {selectedRequest.organizer.email}</span>
                   )}
                   {selectedRequest.organizer?.phone && (
-                    <span className="text-slate-500 block">Phone: {selectedRequest.organizer.phone}</span>
+                    <span className="text-text-muted block">Phone: {selectedRequest.organizer.phone}</span>
                   )}
                 </div>
 
                 <div>
-                  <span className="text-slate-400 block font-semibold uppercase text-[10px]">Event & Schedule</span>
-                  <span className="font-bold text-slate-800 text-sm">
+                  <span className="text-text-muted block font-semibold uppercase text-[10px]">Event & Schedule</span>
+                  <span className="font-bold text-text-primary text-sm">
                     {formatDisplayDateTime(selectedRequest.serviceDateTime || selectedRequest.event?.startDateTime)}
                   </span>
-                  <span className="text-slate-500 block capitalize">Category: {selectedRequest.event?.category || 'General'}</span>
-                  <span className="text-slate-500 block">Submitted: {formatDisplayDateTime(selectedRequest.createdAt)}</span>
+                  <span className="text-text-muted block capitalize">Category: {selectedRequest.event?.category || 'General'}</span>
+                  <span className="text-text-muted block">Submitted: {formatDisplayDateTime(selectedRequest.createdAt)}</span>
                 </div>
               </div>
 
               {/* Package Snapshot */}
               <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
                   Package Snapshot & Specifications
                 </h4>
-                <div className="p-4 rounded-xl border border-slate-200 bg-white">
+                <div className="p-4 rounded-xl border border-border bg-surface">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
-                      <h5 className="font-bold text-slate-900 text-base">{selectedRequest.selectedPackage?.name}</h5>
-                      <p className="text-xs text-slate-500">{selectedRequest.selectedPackage?.description}</p>
+                      <h5 className="font-bold text-text-primary text-base">{selectedRequest.selectedPackage?.name}</h5>
+                      <p className="text-xs text-text-muted">{selectedRequest.selectedPackage?.description}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <span className="font-black text-amber-700 text-base block">
                         ${selectedRequest.pricePerPlate}/plate
                       </span>
-                      <span className="text-[11px] text-slate-400">Headcount: {selectedRequest.guestCount} guests</span>
+                      <span className="text-[11px] text-text-muted">Headcount: {selectedRequest.guestCount} guests</span>
                     </div>
                   </div>
 
@@ -711,15 +711,15 @@ export default function VendorCateringRequestsPage() {
 
                   {/* Menu items */}
                   {(selectedRequest.selectedPackage?.menuItems || []).length > 0 && (
-                    <div className="pt-2 border-t border-slate-100">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                    <div className="pt-2 border-t border-border">
+                      <span className="text-[10px] font-bold text-text-muted uppercase block mb-1">
                         Courses & Dishes:
                       </span>
                       <div className="flex flex-wrap gap-1.5">
                         {selectedRequest.selectedPackage.menuItems.map((item, idx) => (
                           <span
                             key={idx}
-                            className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[11px]"
+                            className="inline-block px-2 py-0.5 bg-surface-subtle text-text-secondary rounded-md text-[11px]"
                           >
                             {item}
                           </span>
@@ -734,7 +734,7 @@ export default function VendorCateringRequestsPage() {
               <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-xl flex items-center justify-between">
                 <div>
                   <span className="text-xs font-bold text-amber-900 block">Total Contract Amount</span>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-text-muted">
                     ${selectedRequest.pricePerPlate} × {selectedRequest.guestCount} guests
                   </span>
                 </div>
@@ -746,10 +746,10 @@ export default function VendorCateringRequestsPage() {
               {/* Organizer Notes */}
               {selectedRequest.notes && (
                 <div>
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">
                     Special Notes from Organizer
                   </h4>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-700">
+                  <div className="p-3 bg-background rounded-xl border border-border text-xs text-text-secondary">
                     "{selectedRequest.notes}"
                   </div>
                 </div>
@@ -757,12 +757,12 @@ export default function VendorCateringRequestsPage() {
             </div>
 
             {/* Footer */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between shrink-0">
-              <span className="text-xs text-slate-400">Vendor responses are binding</span>
+            <div className="pt-4 border-t border-border flex items-center justify-between shrink-0">
+              <span className="text-xs text-text-muted">Vendor responses are binding</span>
               <button
                 type="button"
                 onClick={() => setSelectedRequest(null)}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
+                className="px-4 py-2 text-sm font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted rounded-xl"
               >
                 Close
               </button>

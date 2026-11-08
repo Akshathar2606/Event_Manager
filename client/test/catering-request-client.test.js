@@ -197,7 +197,7 @@ describe('EventFlow Catering Request Frontend Service & Workflow Unit Tests', ()
 
       const cancelledBadge = getCateringRequestStatusBadge('cancelled');
       assert.equal(cancelledBadge.label, 'Cancelled');
-      assert.match(cancelledBadge.classes, /slate/);
+      assert.match(cancelledBadge.classes, /surface-subtle/);
 
       const unknownBadge = getCateringRequestStatusBadge('unknown');
       assert.equal(unknownBadge.label, 'unknown');
@@ -289,6 +289,18 @@ describe('EventFlow Catering Request Frontend Service & Workflow Unit Tests', ()
       });
       assert.equal(resOverCap.isValid, false);
       assert.ok(resOverCap.errors.some((e) => /exceeds event venue capacity of 100/i.test(e)));
+
+      const limitedPackage = { ...basePackage, maxGuests: 75 };
+      const resOverPackageCapacity = validateCateringRequestForm({
+        eventId: baseEvent.id,
+        cateringServiceId: 'cat_1',
+        packageId: limitedPackage.id,
+        guestCount: 80,
+        selectedPackage: limitedPackage,
+        selectedEvent: baseEvent
+      });
+      assert.equal(resOverPackageCapacity.isValid, false);
+      assert.ok(resOverPackageCapacity.errors.some((e) => /maximum capacity of 75/i.test(e)));
 
       // 5. Invalid guest count formats
       const resInvalidCount = validateCateringRequestForm({

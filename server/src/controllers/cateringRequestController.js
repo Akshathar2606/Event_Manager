@@ -4,6 +4,10 @@ const { Event } = require('../models/Event');
 const { CateringService } = require('../models/CateringService');
 const { User } = require('../models/User');
 const {
+  deliverNotification,
+  recordEventActivity
+} = require('../services/workflowService');
+const {
   isValidObjectId,
   validateCreateCateringRequestInput,
   validateRejectionInput,
@@ -228,10 +232,19 @@ const createCateringRequest = async (req, res, next) => {
     }
 
     // 4. Validate Guest Count against Package Minimum & Event Capacity
-    if (guestCount < selectedPkg.minOrder) {
+    const minOrder = Number(selectedPkg.minOrder ?? 10);
+    const maxGuests = selectedPkg.maxGuests == null ? null : Number(selectedPkg.maxGuests);
+    if (guestCount < minOrder) {
       return res.status(400).json({
         success: false,
-        message: `Guest count (${guestCount}) is below the package minimum order of ${selectedPkg.minOrder} people.`
+        message: `Guest count (${guestCount}) is below the package minimum order of ${minOrder} people.`
+      });
+    }
+
+    if (maxGuests !== null && guestCount > maxGuests) {
+      return res.status(400).json({
+        success: false,
+        message: `Guest count (${guestCount}) exceeds the package maximum capacity of ${maxGuests} people.`
       });
     }
 
@@ -252,7 +265,8 @@ const createCateringRequest = async (req, res, next) => {
       name: selectedPkg.name,
       description: selectedPkg.description || '',
       pricePerPlate: selectedPkg.pricePerPlate,
-      minOrder: selectedPkg.minOrder,
+      minOrder,
+      ...(maxGuests !== null && { maxGuests }),
       menuItems: Array.isArray(selectedPkg.menuItems) ? [...selectedPkg.menuItems] : [],
       dietaryOptions: Array.isArray(selectedPkg.dietaryOptions) ? [...selectedPkg.dietaryOptions] : []
     };
@@ -285,6 +299,24 @@ const createCateringRequest = async (req, res, next) => {
       };
 
       mockStore.set(newRequest.id, newRequest);
+      await recordEventActivity(req, {
+        eventId,
+        actorId: organizerId,
+        action: 'catering_request_created',
+        description: `A catering request was created for "${event.title}".`,
+        metadata: { requestId: newRequest.id },
+        dedupeKey: `catering-created:${newRequest.id}`
+      });
+      await deliverNotification(req, {
+        recipientId: vendorId,
+        actorId: organizerId,
+        type: 'catering_requested',
+        title: 'New catering request',
+        message: `A catering request was submitted for "${event.title}".`,
+        entityType: 'cateringRequest',
+        entityId: newRequest.id,
+        dedupeKey: `catering-created:${newRequest.id}`
+      });
 
       return res.status(201).json({
         success: true,
@@ -312,6 +344,24 @@ const createCateringRequest = async (req, res, next) => {
     await requestDoc.populate('cateringService', 'businessName serviceArea contactEmail contactPhone cuisineTypes isAvailable');
     await requestDoc.populate('vendor', 'name email phone organization');
     await requestDoc.populate('organizer', 'name email phone organization');
+    await recordEventActivity(req, {
+      eventId,
+      actorId: organizerId,
+      action: 'catering_request_created',
+      description: `A catering request was created for "${event.title}".`,
+      metadata: { requestId: requestDoc._id },
+      dedupeKey: `catering-created:${requestDoc._id}`
+    });
+    await deliverNotification(req, {
+      recipientId: vendorId,
+      actorId: organizerId,
+      type: 'catering_requested',
+      title: 'New catering request',
+      message: `A catering request was submitted for "${event.title}".`,
+      entityType: 'cateringRequest',
+      entityId: requestDoc._id,
+      dedupeKey: `catering-created:${requestDoc._id}`
+    });
 
     return res.status(201).json({
       success: true,
@@ -593,6 +643,26 @@ const acceptCateringRequest = async (req, res, next) => {
       request.respondedAt = new Date().toISOString();
       request.vendorNotes = typeof vendorNotes === 'string' ? vendorNotes.trim().slice(0, 1000) : '';
       request.updatedAt = new Date().toISOString();
+      const event = getEventStore(req)?.get(extractId(request.event));
+      const eventTitle = event?.title || 'Event';
+      await recordEventActivity(req, {
+        eventId: extractId(request.event),
+        actorId: req.user.id,
+        action: 'catering_request_accepted',
+        description: `The catering request for "${eventTitle}" was accepted.`,
+        metadata: { requestId: id, status: 'accepted' },
+        dedupeKey: `catering-accepted:${id}`
+      });
+      await deliverNotification(req, {
+        recipientId: extractId(request.organizer),
+        actorId: req.user.id,
+        type: 'catering_accepted',
+        title: 'Catering request accepted',
+        message: `The catering request for "${eventTitle}" was accepted.`,
+        entityType: 'cateringRequest',
+        entityId: id,
+        dedupeKey: `catering-accepted:${id}`
+      });
 
       return res.status(200).json({
         success: true,
@@ -654,6 +724,25 @@ const acceptCateringRequest = async (req, res, next) => {
         message: 'Request status was modified by another concurrent operation.'
       });
     }
+
+    await recordEventActivity(req, {
+      eventId: extractId(updated.event),
+      actorId: req.user.id,
+      action: 'catering_request_accepted',
+      description: `The catering request for "${updated.event?.title || 'Event'}" was accepted.`,
+      metadata: { requestId: updated._id, status: 'accepted' },
+      dedupeKey: `catering-accepted:${id}`
+    });
+    await deliverNotification(req, {
+      recipientId: extractId(updated.organizer),
+      actorId: req.user.id,
+      type: 'catering_accepted',
+      title: 'Catering request accepted',
+      message: `The catering request for "${updated.event?.title || 'Event'}" was accepted.`,
+      entityType: 'cateringRequest',
+      entityId: updated._id,
+      dedupeKey: `catering-accepted:${id}`
+    });
 
     return res.status(200).json({
       success: true,
@@ -724,6 +813,26 @@ const rejectCateringRequest = async (req, res, next) => {
       request.rejectionReason = rejectionReason;
       if (vendorNotes) request.vendorNotes = vendorNotes;
       request.updatedAt = new Date().toISOString();
+      const event = getEventStore(req)?.get(extractId(request.event));
+      const eventTitle = event?.title || 'Event';
+      await recordEventActivity(req, {
+        eventId: extractId(request.event),
+        actorId: req.user.id,
+        action: 'catering_request_rejected',
+        description: `The catering request for "${eventTitle}" was rejected.`,
+        metadata: { requestId: id, status: 'rejected' },
+        dedupeKey: `catering-rejected:${id}`
+      });
+      await deliverNotification(req, {
+        recipientId: extractId(request.organizer),
+        actorId: req.user.id,
+        type: 'catering_rejected',
+        title: 'Catering request rejected',
+        message: `The catering request for "${eventTitle}" was rejected.`,
+        entityType: 'cateringRequest',
+        entityId: id,
+        dedupeKey: `catering-rejected:${id}`
+      });
 
       return res.status(200).json({
         success: true,
@@ -785,6 +894,25 @@ const rejectCateringRequest = async (req, res, next) => {
         message: 'Request status was modified by another concurrent operation.'
       });
     }
+
+    await recordEventActivity(req, {
+      eventId: extractId(updated.event),
+      actorId: req.user.id,
+      action: 'catering_request_rejected',
+      description: `The catering request for "${updated.event?.title || 'Event'}" was rejected.`,
+      metadata: { requestId: updated._id, status: 'rejected' },
+      dedupeKey: `catering-rejected:${id}`
+    });
+    await deliverNotification(req, {
+      recipientId: extractId(updated.organizer),
+      actorId: req.user.id,
+      type: 'catering_rejected',
+      title: 'Catering request rejected',
+      message: `The catering request for "${updated.event?.title || 'Event'}" was rejected.`,
+      entityType: 'cateringRequest',
+      entityId: updated._id,
+      dedupeKey: `catering-rejected:${id}`
+    });
 
     return res.status(200).json({
       success: true,
@@ -874,6 +1002,16 @@ const cancelCateringRequest = async (req, res, next) => {
       request.cancelledAt = new Date().toISOString();
       request.cancellationReason = cancellationReason || '';
       request.updatedAt = new Date().toISOString();
+      await deliverNotification(req, {
+        recipientId: extractId(request.vendor),
+        actorId: req.user.id,
+        type: 'catering_cancelled',
+        title: 'Catering request cancelled',
+        message: `A catering request for "${eventStore?.get(extractId(request.event))?.title || 'an event'}" was cancelled.`,
+        entityType: 'cateringRequest',
+        entityId: id,
+        dedupeKey: `catering-cancelled:${id}`
+      });
 
       return res.status(200).json({
         success: true,
@@ -936,6 +1074,16 @@ const cancelCateringRequest = async (req, res, next) => {
     await request.populate('cateringService', 'businessName serviceArea contactEmail contactPhone cuisineTypes isAvailable');
     await request.populate('vendor', 'name email phone organization');
     await request.populate('organizer', 'name email phone organization');
+    await deliverNotification(req, {
+      recipientId: extractId(request.vendor),
+      actorId: req.user.id,
+      type: 'catering_cancelled',
+      title: 'Catering request cancelled',
+      message: `A catering request for "${request.event?.title || 'an event'}" was cancelled.`,
+      entityType: 'cateringRequest',
+      entityId: request._id,
+      dedupeKey: `catering-cancelled:${id}`
+    });
 
     return res.status(200).json({
       success: true,

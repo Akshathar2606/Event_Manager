@@ -32,9 +32,9 @@ export const authService = {
   },
 
   /**
-   * Registers a new user (participant or organizer).
+   * Registers a participant, organizer, or vendor application.
    */
-  async register({ name, email, password, role, phone, organization }) {
+  async register({ name, email, password, role, phone, organization, vendorApplication }) {
     const response = await api.post('/auth/register', {
       name,
       email,
@@ -42,6 +42,7 @@ export const authService = {
       role,
       phone,
       organization,
+      vendorApplication,
     });
     const { token, user } = response.data;
     if (token) {
@@ -55,6 +56,14 @@ export const authService = {
    */
   async getCurrentUser() {
     const response = await api.get('/auth/me');
+    return response.data.user;
+  },
+
+  /**
+   * Updates editable fields on the authenticated user's own profile.
+   */
+  async updateMyProfile(profileData) {
+    const response = await api.patch('/auth/me', profileData);
     return response.data.user;
   },
 

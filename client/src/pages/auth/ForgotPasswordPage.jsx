@@ -32,27 +32,27 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <Link to="/" className="inline-flex items-center gap-2 mb-4">
           <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-indigo-200">
             EF
           </div>
-          <span className="font-extrabold text-2xl text-slate-900 tracking-tight">EventFlow</span>
+          <span className="font-extrabold text-2xl text-text-primary tracking-tight">EventFlow</span>
         </Link>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Forgot your password?</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Forgot your password?</h1>
+        <p className="mt-1 text-sm text-text-muted">
           Enter your email and we&apos;ll help you get back into your account.
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
-        <div className="bg-white py-8 px-6 sm:px-10 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-surface py-8 px-6 sm:px-10 rounded-2xl border border-border shadow-sm">
           {submitted ? (
             <div className="text-center" role="status">
               <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto mb-4" />
-              <h2 className="text-lg font-semibold text-slate-900">Check your email</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <h2 className="text-lg font-semibold text-text-primary">Check your email</h2>
+              <p className="mt-2 text-sm leading-6 text-text-secondary">
                 If an active account matches that email address, recovery instructions may be sent to its
                 registered address. For security, we don&apos;t disclose account status.
               </p>
@@ -72,12 +72,12 @@ export default function ForgotPasswordPage() {
                 <div>
                   <label
                     htmlFor="recovery-email"
-                    className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
+                    className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5"
                   >
                     Email Address
                   </label>
                   <div className="relative">
-                    <Mail className="absolute inset-y-0 left-0 ml-3 my-auto w-4 h-4 text-slate-400" />
+                    <Mail className="absolute inset-y-0 left-0 ml-3 my-auto w-4 h-4 text-text-muted" />
                     <input
                       id="recovery-email"
                       name="email"
@@ -90,10 +90,10 @@ export default function ForgotPasswordPage() {
                         setRequestError('');
                       }}
                       placeholder="you@institution.edu"
-                      className={`block w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border bg-white text-slate-900 placeholder:text-slate-400 transition-colors focus:outline-hidden focus:ring-2 ${
+                      className={`block w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border bg-surface text-text-primary placeholder:text-text-muted transition-colors focus:outline-hidden focus:ring-2 ${
                         emailError
                           ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
-                          : 'border-slate-200 focus:border-indigo-600 focus:ring-indigo-100'
+                          : 'border-border focus:border-indigo-600 focus:ring-indigo-100'
                       }`}
                       aria-invalid={Boolean(emailError)}
                       aria-describedby={emailError ? 'recovery-email-error' : undefined}
@@ -122,7 +122,7 @@ export default function ForgotPasswordPage() {
               </form>
             </>
           )}
-          <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+          <div className="mt-6 pt-5 border-t border-border text-center">
             <Link
               to="/login"
               className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-700"

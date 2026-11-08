@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { REGISTRATION_STATUS } = require('../models/Registration');
+const { REGISTRATION_STATUS, ATTENDANCE_STATUS } = require('../models/Registration');
 const { STUDENT_YEARS } = require('../models/Event');
 
 /**
@@ -102,7 +102,44 @@ const validateRegistrationQuery = (query = {}) => {
     }
   }
 
-  return { page, limit, status };
+  const attendanceStatus = typeof query.attendanceStatus === 'string' &&
+    ATTENDANCE_STATUS.includes(query.attendanceStatus.trim().toLowerCase())
+    ? query.attendanceStatus.trim().toLowerCase()
+    : undefined;
+  const sortFields = new Set([
+    'registeredAt',
+    'name',
+    'email',
+    'organization',
+    'status',
+    'attendanceStatus',
+    'academicYear'
+  ]);
+  const requestedSort = typeof query.sortBy === 'string' ? query.sortBy.trim() : '';
+  const sortBy = sortFields.has(requestedSort) ? requestedSort : 'registeredAt';
+  const sortOrder = String(query.sortOrder || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
+  const cleanText = (value) => typeof value === 'string' ? value.trim().slice(0, 100) : '';
+  const dateFrom = cleanText(query.dateFrom);
+  const dateTo = cleanText(query.dateTo);
+  const validFrom = dateFrom && !Number.isNaN(Date.parse(dateFrom)) ? new Date(dateFrom) : undefined;
+  const parsedTo = dateTo && !Number.isNaN(Date.parse(dateTo)) ? new Date(dateTo) : undefined;
+  const validTo = parsedTo && /^\d{4}-\d{2}-\d{2}$/.test(dateTo)
+    ? new Date(`${dateTo}T23:59:59.999Z`)
+    : parsedTo;
+
+  return {
+    page,
+    limit,
+    status,
+    attendanceStatus,
+    search: cleanText(query.search),
+    department: cleanText(query.department),
+    dateFrom: validFrom,
+    dateTo: validTo,
+    sortBy,
+    sortOrder,
+    idsOnly: query.idsOnly === 'true'
+  };
 };
 
 module.exports = {

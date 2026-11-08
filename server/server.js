@@ -1,4 +1,5 @@
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 
 // 1. Load environment variables before reading configuration or importing app/db
 dotenv.config();
@@ -6,6 +7,8 @@ dotenv.config();
 const app = require('./src/app');
 const connectDB = require('./src/config/db');
 const PasswordRecoveryAttempt = require('./src/models/PasswordRecoveryAttempt');
+const { ReminderJob } = require('./src/models/ReminderJob');
+const { startReminderScheduler } = require('./src/services/reminderScheduler');
 
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -35,18 +38,34 @@ const startServer = async () => {
     // Await database connection before accepting any HTTP requests
     await connectDB();
     await PasswordRecoveryAttempt.init();
+    await ReminderJob.init();
 
     const server = app.listen(PORT, () => {
       console.log(`[EventFlow Server] Running on port ${PORT} in ${NODE_ENV} mode`);
     });
+    const reminderScheduler = startReminderScheduler({ app });
+    let shuttingDown = false;
+
+    const shutdown = async (exitCode = 0) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      await reminderScheduler?.stop();
+      await new Promise((resolve) => server.close(resolve));
+      await mongoose.disconnect();
+      if (exitCode !== null) process.exit(exitCode);
+    };
+
+    process.once('SIGINT', () => { void shutdown(); });
+    process.once('SIGTERM', () => { void shutdown(); });
 
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (err) => {
       console.error(`[Unhandled Rejection] Error: ${sanitizeErrorMessage(err)}`);
       // Close server & exit process gracefully
-      server.close(() => process.exit(1));
+      void shutdown(1);
     });
 
+    server.reminderScheduler = reminderScheduler;
     return server;
   } catch (err) {
     // 3. Exit with a non-zero status if connection or startup fails

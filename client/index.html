@@ -2,11 +2,32 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EventFlow | Multi-Role Event Management Platform</title>
+    <meta name="theme-color" content="#3730A3" />
+    <meta name="description" content="Plan smarter, coordinate venues and services, manage registrations, and bring every part of your event together with EventFlow." />
+    <title>EventFlow | Every Great Event Begins Here</title>
+    <script>
+      (() => {
+        try {
+          const preference = localStorage.getItem('eventflow_theme');
+          const validPreference = ['light', 'dark', 'system'].includes(preference)
+            ? preference
+            : 'system';
+          const systemPrefersDark = typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const useDarkTheme = validPreference === 'dark' ||
+            (validPreference === 'system' && systemPrefersDark);
+          const theme = useDarkTheme ? 'dark' : 'light';
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+          document.documentElement.classList.toggle('dark', useDarkTheme);
+        } catch {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
   </head>
-  <body class="bg-gray-50 text-gray-900 antialiased min-h-screen">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

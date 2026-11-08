@@ -52,6 +52,11 @@ export const eventService = {
     return response.data.data;
   },
 
+  async getEventActivity(id, params = {}) {
+    const response = await api.get(`/events/${id}/activity`, { params });
+    return response.data;
+  },
+
   /**
    * Create a new draft event (Organizer/Admin only).
    * @param {Object} eventData - Event fields

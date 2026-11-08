@@ -11,7 +11,18 @@ const isValidObjectId = (id) => {
  */
 const validateCateringProfileInput = (input, isUpdate = false) => {
   const errors = [];
-  const { businessName, description, contactEmail, contactPhone, serviceArea, cuisineTypes } = input || {};
+  const {
+    businessName,
+    description,
+    contactEmail,
+    contactPhone,
+    serviceArea,
+    city,
+    locality,
+    fullAddress,
+    location,
+    cuisineTypes
+  } = input || {};
 
   // Business Name
   if (!isUpdate || businessName !== undefined) {
@@ -34,6 +45,38 @@ const validateCateringProfileInput = (input, isUpdate = false) => {
   // Description
   if (description !== undefined && typeof description === 'string' && description.length > 1000) {
     errors.push('Description cannot exceed 1000 characters.');
+  }
+
+  const optionalLocationStrings = [
+    ['city', city, 100],
+    ['locality', locality, 120],
+    ['full address', fullAddress, 250]
+  ];
+  optionalLocationStrings.forEach(([label, value, maxLength]) => {
+    if (value !== undefined && value !== null) {
+      if (typeof value !== 'string') {
+        errors.push(`${label} must be a string.`);
+      } else if (value.trim().length > maxLength) {
+        errors.push(`${label} cannot exceed ${maxLength} characters.`);
+      }
+    }
+  });
+
+  if (location !== undefined && location !== null) {
+    const coordinates = location && location.coordinates;
+    if (
+      !location ||
+      location.type !== 'Point' ||
+      !Array.isArray(coordinates) ||
+      coordinates.length !== 2 ||
+      !coordinates.every(Number.isFinite) ||
+      coordinates[0] < -180 ||
+      coordinates[0] > 180 ||
+      coordinates[1] < -90 ||
+      coordinates[1] > 90
+    ) {
+      errors.push('Location must be a GeoJSON Point with [longitude, latitude] coordinates in valid ranges.');
+    }
   }
 
   // Contact Email
@@ -70,11 +113,15 @@ const validateCateringProfileInput = (input, isUpdate = false) => {
     isValid: errors.length === 0,
     errors,
     sanitized: {
-      ...(businessName !== undefined && { businessName: businessName.trim() }),
-      ...(description !== undefined && { description: description.trim() }),
-      ...(contactEmail !== undefined && { contactEmail: contactEmail.trim().toLowerCase() }),
+      ...(businessName !== undefined && { businessName: typeof businessName === 'string' ? businessName.trim() : '' }),
+      ...(description !== undefined && { description: typeof description === 'string' ? description.trim() : '' }),
+      ...(contactEmail !== undefined && { contactEmail: typeof contactEmail === 'string' ? contactEmail.trim().toLowerCase() : '' }),
       ...(contactPhone !== undefined && { contactPhone: contactPhone ? String(contactPhone).trim() : '' }),
-      ...(serviceArea !== undefined && { serviceArea: serviceArea.trim() }),
+      ...(serviceArea !== undefined && { serviceArea: typeof serviceArea === 'string' ? serviceArea.trim() : '' }),
+      ...(city !== undefined && { city: typeof city === 'string' ? city.trim() : '' }),
+      ...(locality !== undefined && { locality: typeof locality === 'string' ? locality.trim() : '' }),
+      ...(fullAddress !== undefined && { fullAddress: typeof fullAddress === 'string' ? fullAddress.trim() : '' }),
+      ...(location !== undefined && { location: location === null ? null : location }),
       ...(cuisineTypes !== undefined && { cuisineTypes: sanitizedCuisines })
     }
   };
@@ -83,9 +130,9 @@ const validateCateringProfileInput = (input, isUpdate = false) => {
 /**
  * Validates a catering package payload.
  */
-const validatePackageInput = (input, isUpdate = false) => {
+const validatePackageInput = (input, isUpdate = false, currentPackage = {}) => {
   const errors = [];
-  const { name, description, pricePerPlate, minOrder, menuItems, dietaryOptions } = input || {};
+  const { name, description, pricePerPlate, minOrder, maxGuests, menuItems, dietaryOptions } = input || {};
 
   // Package Name
   if (!isUpdate || name !== undefined) {
@@ -111,6 +158,21 @@ const validatePackageInput = (input, isUpdate = false) => {
     const numOrder = Number(minOrder);
     if (isNaN(numOrder) || !Number.isInteger(numOrder) || numOrder < 1) {
       errors.push('Minimum order size must be a whole number of at least 1 person.');
+    }
+  }
+
+  const maxGuestsSupplied = maxGuests !== undefined && maxGuests !== null && maxGuests !== '';
+  const effectiveMaxGuests = maxGuests === null || maxGuests === ''
+    ? null
+    : (maxGuests !== undefined ? Number(maxGuests) : currentPackage.maxGuests);
+  if (maxGuestsSupplied && (!Number.isInteger(effectiveMaxGuests) || effectiveMaxGuests < 1)) {
+      errors.push('Maximum guest capacity must be a whole number of at least 1 person.');
+  } else if (effectiveMaxGuests !== undefined && effectiveMaxGuests !== null) {
+    const effectiveMinOrder = minOrder !== undefined && minOrder !== null && minOrder !== ''
+      ? Number(minOrder)
+      : (currentPackage.minOrder || 10);
+    if (effectiveMaxGuests < effectiveMinOrder) {
+      errors.push('Maximum guest capacity must be greater than or equal to the minimum order.');
     }
   }
 
@@ -168,6 +230,7 @@ const validatePackageInput = (input, isUpdate = false) => {
       ...(description !== undefined && { description: description.trim() }),
       ...(pricePerPlate !== undefined && { pricePerPlate: Number(pricePerPlate) }),
       ...(minOrder !== undefined && { minOrder: Number(minOrder) }),
+      ...(maxGuests !== undefined && { maxGuests: maxGuests === null || maxGuests === '' ? null : Number(maxGuests) }),
       ...(menuItems !== undefined && { menuItems: sanitizedMenuItems }),
       ...(dietaryOptions !== undefined && { dietaryOptions: sanitizedDietary })
     }

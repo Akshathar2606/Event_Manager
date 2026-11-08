@@ -45,6 +45,7 @@ describe('EventFlow Participant Event Registration Test Suite', () => {
     app.locals.mockVenueStore = new Map();
     app.locals.mockEventStore = new Map();
     app.locals.mockRegistrationStore = new Map();
+    app.locals.mockEventActivityStore = new Map();
 
     // 1. Users
     adminUser = {
@@ -1100,6 +1101,50 @@ describe('EventFlow Participant Event Registration Test Suite', () => {
       assert.equal(attendee.participant.password, undefined);
     });
 
+    test('ObjectId event owner references authorize attendee list, export source, and attendance update', async () => {
+      publishedEvent.organizer = new mongoose.Types.ObjectId(organizer1User.id);
+
+      const attendees = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees`,
+        headers: { authorization: 'Bearer ' + organizer1Token }
+      });
+      assert.equal(attendees.status, 200);
+      assert.equal(attendees.body.count, 2);
+
+      const exportSource = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees/ids`,
+        headers: { authorization: 'Bearer ' + organizer1Token }
+      });
+      assert.equal(exportSource.status, 200);
+      assert.equal(exportSource.body.data.length, 2);
+
+      const attendance = await request(app, {
+        method: 'PATCH',
+        url: `/api/events/${publishedEvent.id}/attendees/attendance`,
+        headers: { authorization: 'Bearer ' + organizer1Token },
+        body: {
+          updates: [{ registrationId: reg1.id, attendanceStatus: 'present' }]
+        }
+      });
+      assert.equal(attendance.status, 200);
+      assert.equal(app.locals.mockRegistrationStore.get(reg1.id).attendanceStatus, 'present');
+    });
+
+    test('Populated event owner references are normalized before ownership comparison', async () => {
+      publishedEvent.organizer = { _id: new mongoose.Types.ObjectId(organizer1User.id) };
+
+      const res = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees`,
+        headers: { authorization: 'Bearer ' + organizer1Token }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.count, 2);
+    });
+
     test('Organizer attendee view includes the saved academic year and tolerates legacy registrations', async () => {
       const registrations = Array.from(app.locals.mockRegistrationStore.values());
       const legacyRegistration = registrations[0];
@@ -1124,6 +1169,36 @@ describe('EventFlow Participant Event Registration Test Suite', () => {
       });
       assert.equal(res.status, 200);
       assert.equal(res.body.count, 2);
+    });
+
+    test('Administrator retains attendee export-source access while other roles remain restricted', async () => {
+      const admin = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees/ids`,
+        headers: { authorization: 'Bearer ' + adminToken }
+      });
+      assert.equal(admin.status, 200);
+      assert.equal(admin.body.data.length, 2);
+
+      const otherOrganizer = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees/ids`,
+        headers: { authorization: 'Bearer ' + organizer2Token }
+      });
+      assert.equal(otherOrganizer.status, 403);
+
+      const participant = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees/ids`,
+        headers: { authorization: 'Bearer ' + participant1Token }
+      });
+      assert.equal(participant.status, 403);
+
+      const unauthenticated = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees/ids`
+      });
+      assert.equal(unauthenticated.status, 401);
     });
 
     test('Attendee list supports pagination and status filtering', async () => {
@@ -1155,6 +1230,119 @@ describe('EventFlow Participant Event Registration Test Suite', () => {
       assert.equal(pageRes.status, 200);
       assert.equal(pageRes.body.count, 1);
       assert.equal(pageRes.body.pagination.pages, 2);
+    });
+
+    test('Attendee list supports server-side search, department, date and attendance filters', async () => {
+      participant1User.organization = 'Robotics Club';
+      participant2User.organization = 'Design Society';
+      const registrations = Array.from(app.locals.mockRegistrationStore.values());
+      registrations[0].registeredAt = new Date('2026-10-10T12:00:00.000Z');
+      registrations[1].registeredAt = new Date('2026-11-03T12:00:00.000Z');
+      registrations[1].attendanceStatus = 'present';
+
+      const res = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees?search=dana%40student.edu&department=Design&dateFrom=2026-11-01&dateTo=2026-11-03&attendanceStatus=present`,
+        headers: { authorization: 'Bearer ' + organizer1Token }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.pagination.total, 1);
+      assert.equal(res.body.data[0].participant.name, participant2User.name);
+      assert.equal(res.body.data[0].attendanceStatus, 'present');
+      assert.equal(res.body.summary.presentCount, 1);
+      assert.equal(res.body.summary.notMarkedCount, 1);
+
+      const legacyAttendance = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees?attendanceStatus=not_marked`,
+        headers: { authorization: 'Bearer ' + organizer1Token }
+      });
+      assert.equal(legacyAttendance.status, 200);
+      assert.equal(legacyAttendance.body.pagination.total, 1);
+      assert.equal(legacyAttendance.body.data[0].participant.name, participant1User.name);
+    });
+
+    test('Filtered attendee ID selection returns all matching records independent of pagination', async () => {
+      const res = await request(app, {
+        method: 'GET',
+        url: `/api/events/${publishedEvent.id}/attendees/ids?status=registered&limit=1`,
+        headers: { authorization: 'Bearer ' + organizer1Token }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.data.length, 2);
+      assert.equal(res.body.pagination.total, 2);
+      assert.ok(res.body.data.every((id) => typeof id === 'string'));
+    });
+
+    test('Owner organizer can update attendance in bulk and records auditable event activity', async () => {
+      const ids = [reg1.id, reg2.id];
+      const res = await request(app, {
+        method: 'PATCH',
+        url: `/api/events/${publishedEvent.id}/attendees/attendance`,
+        headers: { authorization: 'Bearer ' + organizer1Token },
+        body: {
+          updates: ids.map((registrationId) => ({
+            registrationId,
+            attendanceStatus: 'present'
+          }))
+        }
+      });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.data.updatedCount, 2);
+      const updatedRegistrations = ids.map((id) => app.locals.mockRegistrationStore.get(id));
+      assert.ok(updatedRegistrations.every((registration) =>
+        registration.attendanceStatus === 'present' &&
+        registration.attendanceMarkedBy === organizer1User.id &&
+        registration.attendanceMarkedAt instanceof Date));
+      const activities = Array.from(app.locals.mockEventActivityStore.values());
+      const attendanceActivities = activities.filter((activity) => activity.action === 'attendance_marked');
+      assert.equal(attendanceActivities.length, 2);
+      assert.ok(attendanceActivities.every((activity) =>
+        activity.action === 'attendance_marked' &&
+        activity.eventId === publishedEvent.id));
+      assert.equal(publishedEvent.registeredCount, 2);
+    });
+
+    test('Attendance updates reject unauthorized organizers, participants and cancelled registrations', async () => {
+      const body = { updates: [{ registrationId: reg1.id, attendanceStatus: 'absent' }] };
+      const wrongOrganizer = await request(app, {
+        method: 'PATCH',
+        url: `/api/events/${publishedEvent.id}/attendees/attendance`,
+        headers: { authorization: 'Bearer ' + organizer2Token },
+        body
+      });
+      assert.equal(wrongOrganizer.status, 403);
+
+      const participant = await request(app, {
+        method: 'PATCH',
+        url: `/api/events/${publishedEvent.id}/attendees/attendance`,
+        headers: { authorization: 'Bearer ' + participant1Token },
+        body
+      });
+      assert.equal(participant.status, 403);
+
+      const attendanceActivityCount = Array.from(app.locals.mockEventActivityStore?.values() || [])
+        .filter((activity) => activity.action === 'attendance_marked').length;
+      await request(app, {
+        method: 'PATCH',
+        url: `/api/registrations/${reg1.id}/cancel`,
+        headers: { authorization: 'Bearer ' + participant1Token }
+      });
+      const cancelled = await request(app, {
+        method: 'PATCH',
+        url: `/api/events/${publishedEvent.id}/attendees/attendance`,
+        headers: { authorization: 'Bearer ' + organizer1Token },
+        body
+      });
+      assert.equal(cancelled.status, 404);
+      assert.equal(
+        Array.from(app.locals.mockEventActivityStore.values())
+          .filter((activity) => activity.action === 'attendance_marked').length,
+        attendanceActivityCount
+      );
     });
 
     test('Alternative route GET /api/registrations/event/:id works identically for owner organizer', async () => {

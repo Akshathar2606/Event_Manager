@@ -40,8 +40,15 @@ export default function OrganizerCateringPage() {
 
   // Filters
   const [search, setSearch] = useState('');
+  const [city, setCity] = useState('');
+  const [locality, setLocality] = useState('');
+  const [cuisine, setCuisine] = useState('');
   const [selectedDietary, setSelectedDietary] = useState([]);
   const [maxPrice, setMaxPrice] = useState('');
+  const [expectedGuestCount, setExpectedGuestCount] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [radiusKm, setRadiusKm] = useState('');
 
   // Selected Vendor Detail Modal
   const [selectedVendor, setSelectedVendor] = useState(null);
@@ -77,8 +84,19 @@ export default function OrganizerCateringPage() {
         limit: 10
       };
       if (search.trim()) params.search = search.trim();
+      if (city.trim()) params.city = city.trim();
+      if (locality.trim()) params.locality = locality.trim();
+      if (cuisine.trim()) params.cuisine = cuisine.trim();
       if (selectedDietary.length > 0) params.dietary = selectedDietary.join(',');
       if (maxPrice && !isNaN(Number(maxPrice))) params.maxPrice = Number(maxPrice);
+      if (expectedGuestCount && !isNaN(Number(expectedGuestCount))) {
+        params.guestCount = Number(expectedGuestCount);
+      }
+      if (latitude !== '' && longitude !== '' && radiusKm !== '') {
+        params.latitude = Number(latitude);
+        params.longitude = Number(longitude);
+        params.radiusKm = Number(radiusKm);
+      }
 
       const res = await cateringService.browseCateringServices(params);
       setVendors(res.data || []);
@@ -88,7 +106,18 @@ export default function OrganizerCateringPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, selectedDietary, maxPrice]);
+  }, [
+    search,
+    city,
+    locality,
+    cuisine,
+    selectedDietary,
+    maxPrice,
+    expectedGuestCount,
+    latitude,
+    longitude,
+    radiusKm
+  ]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -124,8 +153,15 @@ export default function OrganizerCateringPage() {
 
   const clearAllFilters = () => {
     setSearch('');
+    setCity('');
+    setLocality('');
+    setCuisine('');
     setSelectedDietary([]);
     setMaxPrice('');
+    setExpectedGuestCount('');
+    setLatitude('');
+    setLongitude('');
+    setRadiusKm('');
   };
 
   // Open Catering Request Modal for a specific vendor & package
@@ -148,6 +184,10 @@ export default function OrganizerCateringPage() {
   // Compute live estimated quote
   const selectedEvent = myEvents.find((e) => (e.id || e._id) === selectedEventId);
   const estimatedTotal = calculateEstimatedQuote(targetPackage?.pricePerPlate || 0, guestCount);
+  const hasDiscoveryFilters = Boolean(
+    search || city || locality || cuisine || maxPrice || expectedGuestCount ||
+    latitude || longitude || radiusKm || selectedDietary.length
+  );
 
   // Handle Catering Request Submission
   const handleSubmitRequest = async (e) => {
@@ -195,7 +235,7 @@ export default function OrganizerCateringPage() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+      <div className="bg-surface rounded-2xl border border-border p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -204,11 +244,11 @@ export default function OrganizerCateringPage() {
                 Catering Discovery
               </span>
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-extrabold text-text-primary tracking-tight">
               Explore Catering Services
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Discover approved campus culinary partners, compare per-plate menus, and submit catering proposals for your events.
+            <p className="mt-1 text-sm text-text-muted">
+              Compare available catering packages by location, cuisine, dietary options, price, and capacity.
             </p>
           </div>
 
@@ -221,9 +261,9 @@ export default function OrganizerCateringPage() {
               <span>My Catering Requests</span>
             </Link>
 
-            <div className="text-xs text-slate-400 bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-200 shrink-0">
+            <div className="text-xs text-text-muted bg-background px-3.5 py-2.5 rounded-xl border border-border shrink-0">
               <span>Vendors: </span>
-              <span className="font-bold text-slate-800">{pagination.total}</span>
+              <span className="font-bold text-text-primary">{pagination.total}</span>
             </div>
           </div>
         </div>
@@ -243,25 +283,50 @@ export default function OrganizerCateringPage() {
       )}
 
       {/* Search & Filter Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="bg-surface rounded-2xl border border-border p-5 shadow-xs space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {/* Keyword Search */}
           <div className="sm:col-span-2 relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
               <Search className="w-4 h-4" />
             </div>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by vendor name, cuisine, or campus area..."
-              className="block w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+              placeholder="Search by vendor name..."
+              className="block w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-border bg-surface placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
             />
           </div>
 
-          {/* Max Price Filter */}
+          <input
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="City (e.g. Tumakuru)"
+            aria-label="Filter by city"
+            className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+          />
+          <input
+            type="text"
+            value={locality}
+            onChange={(e) => setLocality(e.target.value)}
+            placeholder="Locality (e.g. Siddaganga)"
+            aria-label="Filter by locality"
+            className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+          />
+          <input
+            type="text"
+            value={cuisine}
+            onChange={(e) => setCuisine(e.target.value)}
+            placeholder="Cuisine (comma-separated)"
+            aria-label="Filter by cuisine"
+            className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+          />
+
+          {/* Package Filters */}
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
               <DollarSign className="w-4 h-4" />
             </div>
             <input
@@ -270,18 +335,71 @@ export default function OrganizerCateringPage() {
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
               placeholder="Max $/plate budget"
-              className="block w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+              className="block w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-border bg-surface placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
             />
+          </div>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={expectedGuestCount}
+            onChange={(e) => setExpectedGuestCount(e.target.value)}
+            placeholder="Expected guests"
+            aria-label="Filter by expected guest count"
+            className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+          />
+
+          <div className="sm:col-span-2 lg:col-span-3">
+            <p className="text-[11px] font-semibold text-text-muted mb-1">Nearby radius (optional; enter your location)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                type="number"
+                min="-90"
+                max="90"
+                step="any"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                placeholder="Latitude"
+                aria-label="Your latitude"
+                className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+              />
+              <input
+                type="number"
+                min="-180"
+                max="180"
+                step="any"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                placeholder="Longitude"
+                aria-label="Your longitude"
+                className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+              />
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={radiusKm}
+                onChange={(e) => setRadiusKm(e.target.value)}
+                placeholder="Radius (km)"
+                aria-label="Nearby radius in kilometres"
+                className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+              />
+            </div>
+            {(Boolean(latitude || longitude || radiusKm) && !(latitude && longitude && radiusKm)) && (
+              <p className="text-[11px] text-amber-700 mt-1">
+                Enter latitude, longitude, and radius together to filter by distance.
+              </p>
+            )}
           </div>
         </div>
 
         {/* Dietary Filters */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
               Filter by Dietary Options
             </span>
-            {(search || maxPrice || selectedDietary.length > 0) && (
+            {hasDiscoveryFilters && (
               <button
                 type="button"
                 onClick={clearAllFilters}
@@ -302,7 +420,7 @@ export default function OrganizerCateringPage() {
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
                     isSelected
                       ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      : 'bg-background text-text-secondary border-border hover:bg-surface-subtle'
                   }`}
                 >
                   {isSelected ? '✓ ' : ''}
@@ -316,20 +434,20 @@ export default function OrganizerCateringPage() {
 
       {/* Vendors List */}
       {loading ? (
-        <div className="py-20 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center text-slate-400">
+        <div className="py-20 bg-surface rounded-2xl border border-border shadow-xs flex flex-col items-center justify-center text-text-muted">
           <Loader2 className="w-8 h-8 animate-spin text-amber-600 mb-2" />
           <p className="text-sm font-medium">Discovering campus caterers...</p>
         </div>
       ) : vendors.length === 0 ? (
-        <div className="py-20 px-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs text-center">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+        <div className="py-20 px-4 bg-surface rounded-2xl border border-border shadow-xs text-center">
+          <div className="w-12 h-12 rounded-2xl bg-surface-subtle text-text-muted flex items-center justify-center mx-auto mb-3">
             <UtensilsCrossed className="w-6 h-6" />
           </div>
-          <h3 className="font-semibold text-slate-800 text-base">No catering vendors found</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          <h3 className="font-semibold text-text-primary text-base">No catering vendors found</h3>
+          <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
             Try adjusting your search terms or dietary filters to find available campus vendors.
           </p>
-          {(search || maxPrice || selectedDietary.length > 0) && (
+          {hasDiscoveryFilters && (
             <button
               type="button"
               onClick={clearAllFilters}
@@ -347,32 +465,55 @@ export default function OrganizerCateringPage() {
               activePackages.length > 0
                 ? Math.min(...activePackages.map((p) => p.pricePerPlate))
                 : null;
+            const minimumGuests = activePackages.length > 0
+              ? Math.min(...activePackages.map((pkg) => Number(pkg.minOrder ?? 10)))
+              : null;
+            const hasUnboundedPackage = activePackages.some((pkg) => pkg.maxGuests == null);
+            const maximumGuests = activePackages.length > 0 && !hasUnboundedPackage
+              ? Math.max(...activePackages.map((pkg) => Number(pkg.maxGuests)))
+              : null;
 
             return (
               <div
-                key={vendor.id}
-                className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
+                key={vendor.id || vendor._id}
+                className="bg-surface rounded-2xl border border-border p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
               >
                 <div>
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <h3 className="font-bold text-slate-900 text-lg leading-snug group-hover:text-amber-700 transition-colors">
+                    <h3 className="font-bold text-text-primary text-lg leading-snug group-hover:text-amber-700 transition-colors">
                       {vendor.businessName}
                     </h3>
-                    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                      Available
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold border shrink-0 ${
+                      vendor.isAvailable === false
+                        ? 'bg-surface-subtle text-text-secondary border-border'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}>
+                      {vendor.isAvailable === false ? 'Unavailable' : 'Available'}
                     </span>
                   </div>
 
-                  {/* Coverage */}
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">{vendor.serviceArea}</span>
+                  {vendor.isDemoListing && (
+                    <span className="inline-block mb-2 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-semibold">
+                      Fictional demo listing
+                    </span>
+                  )}
+
+                  <div className="flex items-center gap-1.5 text-xs text-text-muted mb-3">
+                    <MapPin className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                    <span className="truncate">
+                      {[vendor.locality, vendor.city].filter(Boolean).join(', ') || vendor.serviceArea}
+                    </span>
                   </div>
+                  {vendor.distanceKm !== undefined && (
+                    <p className="text-[11px] text-text-muted -mt-2 mb-3">
+                      {vendor.distanceKm.toFixed(1)} km away
+                    </p>
+                  )}
 
                   {/* Description */}
                   {vendor.description && (
-                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed mb-4">
+                    <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed mb-4">
                       {vendor.description}
                     </p>
                   )}
@@ -389,7 +530,7 @@ export default function OrganizerCateringPage() {
                         </span>
                       ))}
                       {vendor.cuisineTypes.length > 3 && (
-                        <span className="inline-block px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-400 text-[10px]">
+                        <span className="inline-block px-1.5 py-0.5 rounded-md bg-background text-text-muted text-[10px]">
                           +{vendor.cuisineTypes.length - 3} more
                         </span>
                       )}
@@ -397,23 +538,28 @@ export default function OrganizerCateringPage() {
                   )}
 
                   {/* Package Count & Price summary */}
-                  <div className="p-3 bg-slate-50 rounded-xl mb-4 text-xs flex items-center justify-between">
+                  <div className="p-3 bg-background rounded-xl mb-4 text-xs flex items-center justify-between">
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Available Menus</span>
-                      <span className="font-bold text-slate-800">{activePackages.length} Packages</span>
+                      <span className="text-text-muted block text-[10px] uppercase font-semibold">Available Menus</span>
+                      <span className="font-bold text-text-primary">{activePackages.length} Packages</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Starting at</span>
+                      <span className="text-text-muted block text-[10px] uppercase font-semibold">Starting at</span>
                       <span className="font-bold text-amber-700">
                         {lowestPrice !== null ? `$${lowestPrice}/plate` : 'Custom Quote'}
                       </span>
                     </div>
                   </div>
+                  <div className="text-[11px] text-text-muted mb-3">
+                    Guest capacity: {minimumGuests !== null ? `${minimumGuests}+ minimum` : 'Not stated'}
+                    {' · '}
+                    {maximumGuests === null ? 'No stated maximum' : `Up to ${maximumGuests}`}
+                  </div>
                 </div>
 
                 {/* Card Action */}
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400">Campus Culinary Partner</span>
+                <div className="pt-4 border-t border-border flex items-center justify-between">
+                  <span className="text-[11px] text-text-muted">{vendor.isDemoListing ? 'Fictional demo' : 'Catering vendor'}</span>
                   <button
                     type="button"
                     onClick={() => setSelectedVendor(vendor)}
@@ -429,48 +575,75 @@ export default function OrganizerCateringPage() {
         </div>
       )}
 
+      {pagination.pages > 1 && (
+        <div className="flex items-center justify-between bg-surface rounded-xl border border-border px-4 py-3 text-sm">
+          <span className="text-text-muted">
+            Page <strong className="text-text-primary">{pagination.page}</strong> of{' '}
+            <strong className="text-text-primary">{pagination.pages}</strong> ({pagination.total} vendors)
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => fetchVendors(pagination.page - 1)}
+              disabled={pagination.page <= 1 || loading}
+              className="px-3 py-1.5 rounded-lg border border-border text-text-secondary disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => fetchVendors(pagination.page + 1)}
+              disabled={pagination.page >= pagination.pages || loading}
+              className="px-3 py-1.5 rounded-lg border border-border text-text-secondary disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Vendor & Menus Modal */}
       {selectedVendor && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-2xl w-full p-6 sm:p-8 animate-fadeIn max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-2xl w-full p-6 sm:p-8 animate-fadeIn max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-slate-100 shrink-0">
+            <div className="flex items-start justify-between pb-4 border-b border-border shrink-0">
               <div>
                 <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 mb-1">
-                  Verified Catering Partner
+                  {selectedVendor.isDemoListing ? 'Fictional demo listing' : 'Catering vendor'}
                 </span>
-                <h3 className="font-extrabold text-xl text-slate-900">{selectedVendor.businessName}</h3>
-                <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                <h3 className="font-extrabold text-xl text-text-primary">{selectedVendor.businessName}</h3>
+                <div className="flex items-center gap-1.5 text-xs text-text-muted mt-1">
+                  <MapPin className="w-3.5 h-3.5 text-text-muted" />
                   <span>Coverage: {selectedVendor.serviceArea}</span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedVendor(null)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-text-muted hover:text-text-secondary p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Content Scrollable */}
-            <div className="py-5 overflow-y-auto space-y-6 text-sm text-slate-600 pr-1">
+            <div className="py-5 overflow-y-auto space-y-6 text-sm text-text-secondary pr-1">
               {/* Description */}
               {selectedVendor.description && (
-                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs leading-relaxed text-slate-700">
+                <div className="p-3.5 bg-background rounded-xl border border-border text-xs leading-relaxed text-text-secondary">
                   {selectedVendor.description}
                 </div>
               )}
 
               {/* Packages List */}
               <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">
                   Food Packages & Pricing ({(selectedVendor.packages || []).filter((p) => !p.isArchived).length})
                 </h4>
 
                 {(selectedVendor.packages || []).filter((p) => !p.isArchived).length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">No packages currently listed by this vendor.</p>
+                  <p className="text-xs text-text-muted italic">No packages currently listed by this vendor.</p>
                 ) : (
                   <div className="space-y-4">
                     {selectedVendor.packages
@@ -478,21 +651,24 @@ export default function OrganizerCateringPage() {
                       .map((pkg) => (
                         <div
                           key={pkg.id || pkg._id}
-                          className="p-4 rounded-xl border border-slate-200 bg-white hover:border-amber-200 transition-colors flex flex-col justify-between"
+                          className="p-4 rounded-xl border border-border bg-surface hover:border-amber-200 transition-colors flex flex-col justify-between"
                         >
                           <div>
                             <div className="flex items-start justify-between gap-2 mb-1.5">
                               <div>
-                                <h5 className="font-bold text-slate-900 text-sm">{pkg.name}</h5>
-                                <span className="text-[11px] text-slate-400">Min. order: {pkg.minOrder} guests</span>
+                                <h5 className="font-bold text-text-primary text-sm">{pkg.name}</h5>
+                                <span className="text-[11px] text-text-muted">
+                                  Min. order: {pkg.minOrder ?? 10} guests
+                                  {pkg.maxGuests != null ? ` · Max: ${pkg.maxGuests}` : ' · No stated maximum'}
+                                </span>
                               </div>
                               <span className="font-extrabold text-amber-700 text-sm shrink-0">
-                                ${pkg.pricePerPlate} <span className="text-xs text-slate-400 font-normal">/plate</span>
+                                ${pkg.pricePerPlate} <span className="text-xs text-text-muted font-normal">/plate</span>
                               </span>
                             </div>
 
                             {pkg.description && (
-                              <p className="text-xs text-slate-500 mb-2">{pkg.description}</p>
+                              <p className="text-xs text-text-muted mb-2">{pkg.description}</p>
                             )}
 
                             {/* Dietary Options */}
@@ -511,15 +687,15 @@ export default function OrganizerCateringPage() {
 
                             {/* Menu Items */}
                             {(pkg.menuItems || []).length > 0 && (
-                              <div className="mt-2 pt-2 border-t border-slate-100">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                              <div className="mt-2 pt-2 border-t border-border">
+                                <span className="text-[10px] font-bold text-text-muted uppercase block mb-1">
                                   Included Courses & Dishes:
                                 </span>
                                 <div className="flex flex-wrap gap-1.5">
                                   {pkg.menuItems.map((item, idx) => (
                                     <span
                                       key={idx}
-                                      className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[11px]"
+                                      className="inline-block px-2 py-0.5 bg-surface-subtle text-text-secondary rounded-md text-[11px]"
                                     >
                                       {item}
                                     </span>
@@ -530,9 +706,9 @@ export default function OrganizerCateringPage() {
                           </div>
 
                           {/* Request Proposal Action */}
-                          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                            <span className="text-[11px] text-slate-400">
-                              Estimated starting: ${(pkg.pricePerPlate * pkg.minOrder).toFixed(2)}
+                          <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
+                            <span className="text-[11px] text-text-muted">
+                              Estimated starting: ${(pkg.pricePerPlate * (pkg.minOrder ?? 10)).toFixed(2)}
                             </span>
                             <button
                               type="button"
@@ -551,12 +727,12 @@ export default function OrganizerCateringPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between shrink-0">
-              <span className="text-xs text-slate-400">Proposals are reviewed directly by the campus vendor</span>
+            <div className="pt-4 border-t border-border flex items-center justify-between shrink-0">
+              <span className="text-xs text-text-muted">Proposals are sent directly to the vendor</span>
               <button
                 type="button"
                 onClick={() => setSelectedVendor(null)}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
+                className="px-4 py-2 text-sm font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted rounded-xl"
               >
                 Close
               </button>
@@ -567,23 +743,23 @@ export default function OrganizerCateringPage() {
 
       {/* Catering Proposal Request Modal */}
       {requestModalOpen && targetPackage && targetVendor && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 sm:p-7 animate-fadeIn">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-xl w-full p-6 sm:p-7 animate-fadeIn">
             {/* Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+            <div className="flex items-start justify-between pb-4 border-b border-border">
               <div>
                 <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 mb-1">
                   Submit Catering Proposal
                 </span>
-                <h3 className="font-extrabold text-lg text-slate-900">{targetVendor.businessName}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Package: <span className="font-semibold text-slate-700">{targetPackage.name}</span> (${targetPackage.pricePerPlate}/plate)
+                <h3 className="font-extrabold text-lg text-text-primary">{targetVendor.businessName}</h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Package: <span className="font-semibold text-text-secondary">{targetPackage.name}</span> (${targetPackage.pricePerPlate}/plate)
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setRequestModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-text-muted hover:text-text-secondary p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -614,11 +790,11 @@ export default function OrganizerCateringPage() {
 
               {/* Event Selection */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
                   Target Event <span className="text-rose-500">*</span>
                 </label>
                 {loadingEvents ? (
-                  <div className="py-2 text-xs text-slate-400 flex items-center gap-2">
+                  <div className="py-2 text-xs text-text-muted flex items-center gap-2">
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
                     <span>Loading your events...</span>
                   </div>
@@ -635,7 +811,7 @@ export default function OrganizerCateringPage() {
                     value={selectedEventId}
                     onChange={(e) => setSelectedEventId(e.target.value)}
                     required
-                    className="block w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+                    className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
                   >
                     <option value="">-- Select an event you organize --</option>
                     {myEvents.map((evt) => (
@@ -647,7 +823,7 @@ export default function OrganizerCateringPage() {
                   </select>
                 )}
                 {selectedEvent && (
-                  <div className="mt-1.5 text-[11px] text-slate-500 flex items-center gap-3">
+                  <div className="mt-1.5 text-[11px] text-text-muted flex items-center gap-3">
                     <span>Category: <strong className="capitalize">{selectedEvent.category}</strong></span>
                     {selectedEvent.capacity && (
                       <span>Max Capacity: <strong>{selectedEvent.capacity} guests</strong></span>
@@ -659,25 +835,34 @@ export default function OrganizerCateringPage() {
               {/* Guest Count */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
                     Expected Headcount / Guests <span className="text-rose-500">*</span>
                   </label>
-                  <span className="text-[11px] text-slate-400">
-                    Min order: <strong>{targetPackage.minOrder}</strong>
+                  <span className="text-[11px] text-text-muted">
+                    Min order: <strong>{targetPackage.minOrder ?? 10}</strong>
+                    {targetPackage.maxGuests != null && (
+                      <> · Max: <strong>{targetPackage.maxGuests}</strong></>
+                    )}
                   </span>
                 </div>
                 <input
                   type="number"
-                  min="1"
+                  min={targetPackage.minOrder ?? 10}
+                  max={targetPackage.maxGuests ?? undefined}
                   required
                   value={guestCount}
                   onChange={(e) => setGuestCount(e.target.value)}
-                  placeholder={`Minimum ${targetPackage.minOrder} attendees`}
-                  className="block w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+                  placeholder={`Minimum ${targetPackage.minOrder ?? 10} attendees`}
+                  className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
                 />
-                {Number(guestCount) > 0 && Number(guestCount) < targetPackage.minOrder && (
+                {Number(guestCount) > 0 && Number(guestCount) < (targetPackage.minOrder ?? 10) && (
                   <p className="mt-1 text-[11px] text-amber-600 font-medium">
-                    ⚠️ Headcount is below package minimum order of {targetPackage.minOrder} guests.
+                    ⚠️ Headcount is below package minimum order of {targetPackage.minOrder ?? 10} guests.
+                  </p>
+                )}
+                {targetPackage.maxGuests != null && Number(guestCount) > targetPackage.maxGuests && (
+                  <p className="mt-1 text-[11px] text-rose-600 font-medium">
+                    Guest count exceeds this package's maximum capacity of {targetPackage.maxGuests}.
                   </p>
                 )}
                 {selectedEvent?.capacity && Number(guestCount) > selectedEvent.capacity && (
@@ -689,16 +874,16 @@ export default function OrganizerCateringPage() {
 
               {/* Service Delivery Date Time (Optional) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Requested Service Date & Time <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
+                  Requested Service Date & Time <span className="text-text-muted font-normal lowercase">(optional)</span>
                 </label>
                 <input
                   type="datetime-local"
                   value={serviceDateTime}
                   onChange={(e) => setServiceDateTime(e.target.value)}
-                  className="block w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+                  className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
                 />
-                <p className="mt-1 text-[11px] text-slate-400">
+                <p className="mt-1 text-[11px] text-text-muted">
                   Defaults to your event's scheduled start time if left empty.
                 </p>
               </div>
@@ -706,10 +891,10 @@ export default function OrganizerCateringPage() {
               {/* Special Instructions & Notes */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
                     Special Requirements or Setup Notes
                   </label>
-                  <span className="text-[11px] text-slate-400">{notes.length}/1000</span>
+                  <span className="text-[11px] text-text-muted">{notes.length}/1000</span>
                 </div>
                 <textarea
                   rows="3"
@@ -717,7 +902,7 @@ export default function OrganizerCateringPage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Specify buffet table locations, serving timelines, dietary counts, or delivery details..."
-                  className="block w-full px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
+                  className="block w-full px-3 py-2 text-sm rounded-xl border border-border bg-surface focus:outline-hidden focus:ring-2 focus:ring-amber-100 focus:border-amber-600"
                 />
               </div>
 
@@ -727,7 +912,7 @@ export default function OrganizerCateringPage() {
                   <span className="text-[11px] uppercase tracking-wider font-semibold text-amber-800 block">
                     Estimated Total (Client Calculation)
                   </span>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-text-muted">
                     ${targetPackage.pricePerPlate} × {Number(guestCount) || 0} guests
                   </span>
                 </div>
@@ -735,17 +920,17 @@ export default function OrganizerCateringPage() {
                   <span className="text-lg font-black text-amber-900 block">
                     ${estimatedTotal.toFixed(2)}
                   </span>
-                  <span className="text-[10px] text-slate-400">Server authoritatively quotes on creation</span>
+                  <span className="text-[10px] text-text-muted">Server authoritatively quotes on creation</span>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+              <div className="pt-3 border-t border-border flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setRequestModalOpen(false)}
                   disabled={submitting}
-                  className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted rounded-xl disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -774,46 +959,46 @@ export default function OrganizerCateringPage() {
 
       {/* Submission Confirmation Modal */}
       {submittedRequest && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 sm:p-7 text-center animate-fadeIn">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl border border-border shadow-xl max-w-md w-full p-6 sm:p-7 text-center animate-fadeIn">
             <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200">
               <CheckCircle2 className="w-6 h-6" />
             </div>
 
-            <h3 className="text-lg font-bold text-slate-900">Catering Proposal Submitted!</h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            <h3 className="text-lg font-bold text-text-primary">Catering Proposal Submitted!</h3>
+            <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
               Your proposal has been submitted and is currently <strong>Pending Review</strong> with the vendor.
               The caterer will review menu feasibility and confirm your date.
             </p>
 
             {/* Server-Confirmed Receipt Details */}
-            <div className="mt-5 p-4 bg-slate-50 border border-slate-200/80 rounded-xl text-left text-xs space-y-2">
+            <div className="mt-5 p-4 bg-background border border-border rounded-xl text-left text-xs space-y-2">
               <div className="flex justify-between">
-                <span className="text-slate-400">Server-Confirmed Quote:</span>
+                <span className="text-text-muted">Server-Confirmed Quote:</span>
                 <span className="font-extrabold text-amber-700 text-sm">
                   ${Number(submittedRequest.quotedPrice).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Rate per Plate:</span>
-                <span className="font-semibold text-slate-800">
+                <span className="text-text-muted">Rate per Plate:</span>
+                <span className="font-semibold text-text-primary">
                   ${Number(submittedRequest.pricePerPlate).toFixed(2)} / plate
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Guest Count:</span>
-                <span className="font-semibold text-slate-800">
+                <span className="text-text-muted">Guest Count:</span>
+                <span className="font-semibold text-text-primary">
                   {submittedRequest.guestCount} guests
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Package:</span>
-                <span className="font-semibold text-slate-800">
+                <span className="text-text-muted">Package:</span>
+                <span className="font-semibold text-text-primary">
                   {submittedRequest.selectedPackage?.name}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Initial Status:</span>
+                <span className="text-text-muted">Initial Status:</span>
                 <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
                   Pending Review
                 </span>
@@ -824,7 +1009,7 @@ export default function OrganizerCateringPage() {
               <button
                 type="button"
                 onClick={() => setSubmittedRequest(null)}
-                className="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl"
+                className="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-text-secondary bg-surface-subtle hover:bg-surface-muted rounded-xl"
               >
                 Explore More Caterers
               </button>

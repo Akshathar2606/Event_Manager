@@ -1,5 +1,5 @@
 const express = require('express');
-const { register, login, forgotPassword, resetPassword, getMe } = require('../controllers/authController');
+const { register, login, forgotPassword, resetPassword, getMe, updateMe } = require('../controllers/authController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 const { passwordRecoveryRateLimit } = require('../middleware/passwordRecoveryRateLimit');
@@ -14,6 +14,7 @@ router.post('/reset-password', passwordRecoveryRateLimit, resetPassword);
 
 // Authenticated current-user profile
 router.get('/me', verifyToken, getMe);
+router.patch('/me', verifyToken, updateMe);
 
 // Role verification test routes (used for access control validation)
 router.get(

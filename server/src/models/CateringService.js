@@ -39,6 +39,22 @@ const packageSchema = new mongoose.Schema(
         message: 'Minimum order size must be a whole number'
       }
     },
+    maxGuests: {
+      type: Number,
+      min: [1, 'Maximum guest capacity must be at least 1 person'],
+      validate: [
+        {
+          validator: Number.isInteger,
+          message: 'Maximum guest capacity must be a whole number'
+        },
+        {
+          validator(value) {
+            return value == null || value >= (this.minOrder || 10);
+          },
+          message: 'Maximum guest capacity must be greater than or equal to the minimum order'
+        }
+      ]
+    },
     menuItems: {
       type: [String],
       default: []
@@ -71,6 +87,34 @@ const packageSchema = new mongoose.Schema(
       }
     }
   }
+);
+
+const cateringLocationSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ['Point'],
+      required: true
+    },
+    coordinates: {
+      type: [Number],
+      required: true,
+      validate: {
+        validator(coordinates) {
+          return Array.isArray(coordinates) &&
+            coordinates.length === 2 &&
+            Number.isFinite(coordinates[0]) &&
+            Number.isFinite(coordinates[1]) &&
+            coordinates[0] >= -180 &&
+            coordinates[0] <= 180 &&
+            coordinates[1] >= -90 &&
+            coordinates[1] <= 90;
+        },
+        message: 'Location coordinates must be [longitude, latitude] within valid ranges'
+      }
+    }
+  },
+  { _id: false }
 );
 
 const cateringServiceSchema = new mongoose.Schema(
@@ -110,6 +154,32 @@ const cateringServiceSchema = new mongoose.Schema(
       required: [true, 'Service area or campus location is required'],
       trim: true,
       maxlength: [200, 'Service area cannot exceed 200 characters']
+    },
+    city: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'City cannot exceed 100 characters'],
+      default: ''
+    },
+    locality: {
+      type: String,
+      trim: true,
+      maxlength: [120, 'Locality cannot exceed 120 characters'],
+      default: ''
+    },
+    fullAddress: {
+      type: String,
+      trim: true,
+      maxlength: [250, 'Full address cannot exceed 250 characters'],
+      default: ''
+    },
+    location: {
+      type: cateringLocationSchema,
+      default: undefined
+    },
+    isDemoListing: {
+      type: Boolean,
+      default: false
     },
     cuisineTypes: {
       type: [String],
@@ -152,6 +222,7 @@ const cateringServiceSchema = new mongoose.Schema(
 // Indexes
 cateringServiceSchema.index({ businessName: 'text', description: 'text', serviceArea: 'text' });
 cateringServiceSchema.index({ isAvailable: 1, isArchived: 1 });
+cateringServiceSchema.index({ location: '2dsphere' });
 
 const CateringService = mongoose.model('CateringService', cateringServiceSchema);
 

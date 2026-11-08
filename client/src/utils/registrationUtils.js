@@ -134,8 +134,8 @@ export const getRegistrationStatusBadge = (status) => {
     default:
       return {
         label: status || 'Unknown',
-        classes: 'bg-slate-50 text-slate-700 border-slate-200',
-        dotClass: 'bg-slate-400'
+        classes: 'bg-background text-text-secondary border-border',
+        dotClass: 'bg-text-muted'
       };
   }
 };

@@ -15,8 +15,8 @@ export const DIETARY_OPTIONS = [
 
 export const cateringService = {
   /**
-   * Browse active catering services with optional search, dietary, cuisine, and price filters.
-   * @param {Object} params - { search, dietary, cuisine, maxPrice, page, limit }
+   * Browse active catering services with optional location, package, and pagination filters.
+   * @param {Object} params - { search, city, locality, dietary, cuisine, maxPrice, guestCount, latitude, longitude, radiusKm, page, limit }
    */
   async browseCateringServices(params = {}) {
     const queryParams = { ...params };
@@ -56,7 +56,7 @@ export const cateringService = {
 
   /**
    * Create authenticated vendor's profile.
-   * @param {Object} profileData - { businessName, description, contactEmail, contactPhone, serviceArea, cuisineTypes }
+   * @param {Object} profileData - Profile fields, including optional city, locality, fullAddress, and GeoJSON location
    */
   async createProfile(profileData) {
     const response = await api.post('/catering', profileData);
@@ -83,7 +83,7 @@ export const cateringService = {
 
   /**
    * Add a package to authenticated vendor's profile.
-   * @param {Object} packageData - { name, description, pricePerPlate, minOrder, menuItems, dietaryOptions }
+   * @param {Object} packageData - { name, description, pricePerPlate, minOrder, maxGuests, menuItems, dietaryOptions }
    */
   async addPackage(packageData) {
     const response = await api.post('/catering/my-profile/packages', packageData);

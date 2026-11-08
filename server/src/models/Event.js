@@ -102,7 +102,6 @@ const eventSchema = new mongoose.Schema(
     },
     endDateTime: {
       type: Date,
-      required: [true, 'Event end date and time is required'],
       validate: {
         validator: function (value) {
           if (!this.startDateTime || !value) return true;

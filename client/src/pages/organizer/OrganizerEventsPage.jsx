@@ -45,6 +45,9 @@ import {
   Trash2
 } from 'lucide-react';
 
+const getEventStatus = (event) => event.lifecycleStatus || event.status;
+const getEventId = (event) => String(event?.id || event?._id || '');
+
 const toDatetimeLocal = (isoString) => {
   if (!isoString) return '';
   const date = new Date(isoString);
@@ -81,10 +84,28 @@ const formatDate = (isoString) => {
 
 const getStatusBadge = (status) => {
   switch (status) {
+    case 'upcoming':
+      return {
+        label: 'Upcoming',
+        classes: 'bg-sky-50 text-sky-700 border-sky-200',
+        icon: Calendar
+      };
+    case 'ongoing':
+      return {
+        label: 'Ongoing',
+        classes: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        icon: CheckCircle2
+      };
+    case 'completed':
+      return {
+        label: 'Completed',
+        classes: 'bg-surface-subtle text-text-secondary border-border',
+        icon: CheckCircle2
+      };
     case 'published':
       return {
         label: 'Published',
-        classes: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        classes: 'bg-sky-50 text-sky-700 border-sky-200',
         icon: CheckCircle2
       };
     case 'cancelled':
@@ -110,9 +131,10 @@ export default function OrganizerEventsPage() {
   const [venuesLoading, setVenuesLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [detailEvent, setDetailEvent] = useState(null);
 
   // Filters
-  const [activeTab, setActiveTab] = useState('all'); // 'all', 'draft', 'published', 'cancelled'
+  const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
 
@@ -149,9 +171,9 @@ export default function OrganizerEventsPage() {
   };
   const [formData, setFormData] = useState(initialForm);
 
-  // Fetch organizer's events (using organizer=me to see all drafts, published, and cancelled events)
-  const fetchEvents = useCallback(async () => {
-    setLoading(true);
+  // Fetch organizer's events (using organizer=me to see drafts and all lifecycle states)
+  const fetchEvents = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError(null);
     try {
       const params = {
@@ -173,7 +195,7 @@ export default function OrganizerEventsPage() {
     } catch (err) {
       setError(extractErrorMessage(err, 'Failed to load your events.'));
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [activeTab, search, selectedCategory]);
 
@@ -192,6 +214,16 @@ export default function OrganizerEventsPage() {
 
   useEffect(() => {
     fetchEvents();
+  }, [fetchEvents]);
+
+  useEffect(() => {
+    const refreshEvents = () => fetchEvents(false);
+    const timer = setInterval(refreshEvents, 60_000);
+    window.addEventListener('focus', refreshEvents);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refreshEvents);
+    };
   }, [fetchEvents]);
 
   useEffect(() => {
@@ -250,6 +282,7 @@ export default function OrganizerEventsPage() {
   // Client-side Form Validation
   const validateForm = () => {
     const errs = [];
+    const scheduleLocked = editingEvent && getEventStatus(editingEvent) === 'completed';
     if (!formData.title || formData.title.trim().length < 3) {
       errs.push('Event title is required (minimum 3 characters).');
     }
@@ -262,14 +295,13 @@ export default function OrganizerEventsPage() {
     ) {
       errs.push('Event start date and time is required.');
     }
-    if (
-      !getDateTimePart(formData.endDateTime, 'date') ||
-      !getDateTimePart(formData.endDateTime, 'time')
-    ) {
-      errs.push('Event end date and time is required.');
+    const endDate = getDateTimePart(formData.endDateTime, 'date');
+    const endTime = getDateTimePart(formData.endDateTime, 'time');
+    if (!scheduleLocked && Boolean(endDate) !== Boolean(endTime)) {
+      errs.push('Enter both an end date and end time, or leave both blank.');
     }
 
-    if (formData.startDateTime && formData.endDateTime) {
+    if (!scheduleLocked && formData.startDateTime && endDate && endTime) {
       const start = new Date(formData.startDateTime);
       const end = new Date(formData.endDateTime);
       if (end <= start) {
@@ -321,6 +353,7 @@ export default function OrganizerEventsPage() {
   // Form Submit Handler
   const handleSubmitForm = async (e) => {
     e.preventDefault();
+    const scheduleLocked = editingEvent && getEventStatus(editingEvent) === 'completed';
     const clientErrs = validateForm();
     if (clientErrs.length > 0) {
       setModalErrors(clientErrs);
@@ -349,8 +382,13 @@ export default function OrganizerEventsPage() {
         ? getSafeWhatsAppGroupUrl(formData.whatsappGroupUrl)
         : '',
       venue: formData.venue || null,
-      startDateTime: new Date(formData.startDateTime).toISOString(),
-      endDateTime: new Date(formData.endDateTime).toISOString(),
+      ...(!scheduleLocked && {
+        startDateTime: new Date(formData.startDateTime).toISOString(),
+        endDateTime: getDateTimePart(formData.endDateTime, 'date') &&
+          getDateTimePart(formData.endDateTime, 'time')
+          ? new Date(formData.endDateTime).toISOString()
+          : null
+      }),
       registrationDeadline: formData.registrationDeadline
         ? new Date(formData.registrationDeadline).toISOString()
         : null,
@@ -417,7 +455,7 @@ export default function OrganizerEventsPage() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-xs">
+      <div className="bg-surface rounded-2xl border border-border p-6 sm:p-8 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
@@ -426,10 +464,10 @@ export default function OrganizerEventsPage() {
                 Organizer Event Studio
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
               Event Management
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-text-muted">
               Create drafts, coordinate venues, and publish collegiate conferences, workshops, and festivals.
             </p>
           </div>
@@ -446,10 +484,10 @@ export default function OrganizerEventsPage() {
         </div>
 
         {/* Quick Metric Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-100">
-          <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/70">
-            <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Total Managed</div>
-            <div className="text-xl font-extrabold text-slate-900 mt-0.5">{summaryCounts.total}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-border">
+          <div className="bg-background rounded-xl p-3 border border-border">
+            <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">Total Managed</div>
+            <div className="text-xl font-extrabold text-text-primary mt-0.5">{summaryCounts.total}</div>
           </div>
           <div className="bg-amber-50/60 rounded-xl p-3 border border-amber-200/70">
             <div className="text-[11px] font-medium text-amber-700 uppercase tracking-wider">In Draft</div>
@@ -492,14 +530,16 @@ export default function OrganizerEventsPage() {
       )}
 
       {/* Filter and Tab Navigation Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-4">
+      <div className="bg-surface rounded-2xl border border-border p-4 shadow-xs space-y-4">
         {/* Status Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-3 overflow-x-auto text-xs">
+        <div className="flex items-center gap-2 border-b border-border pb-3 overflow-x-auto text-xs">
           {[
             { id: 'all', label: 'All Events' },
-            { id: 'draft', label: 'Drafts' },
-            { id: 'published', label: 'Published' },
-            { id: 'cancelled', label: 'Cancelled' }
+            { id: 'upcoming', label: 'Upcoming' },
+            { id: 'ongoing', label: 'Ongoing' },
+            { id: 'completed', label: 'Completed' },
+            { id: 'cancelled', label: 'Cancelled' },
+            { id: 'draft', label: 'Drafts' }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -507,7 +547,7 @@ export default function OrganizerEventsPage() {
               className={`px-3 py-1.5 rounded-lg font-semibold transition-colors shrink-0 ${
                 activeTab === tab.id
                   ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  : 'text-text-secondary hover:bg-surface-subtle'
               }`}
             >
               {tab.label}
@@ -518,18 +558,18 @@ export default function OrganizerEventsPage() {
         {/* Search & Category Filter Controls */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by event title, agenda keywords, or tags..."
-              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-border text-xs text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             />
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -540,7 +580,7 @@ export default function OrganizerEventsPage() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
+              className="w-full px-3 py-2 rounded-xl border border-border text-xs text-text-secondary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
             >
               <option value="">All Categories</option>
               {EVENT_CATEGORIES.map((cat) => (
@@ -555,17 +595,17 @@ export default function OrganizerEventsPage() {
 
       {/* Event Cards Grid */}
       {loading ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center shadow-xs">
           <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-3" />
-          <p className="text-xs text-slate-500 font-medium">Loading your events...</p>
+          <p className="text-xs text-text-muted font-medium">Loading your events...</p>
         </div>
       ) : events.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center shadow-xs">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-4">
             <Calendar className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-bold text-slate-900">No events found</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-5">
+          <h3 className="text-base font-bold text-text-primary">No events found</h3>
+          <p className="text-xs text-text-muted max-w-sm mx-auto mt-1 mb-5">
             {search || selectedCategory || activeTab !== 'all'
               ? 'No events match the selected filters. Try clearing your search parameters.'
               : 'You have not created any events yet. Get started by drafting your first campus event.'}
@@ -581,7 +621,9 @@ export default function OrganizerEventsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((event) => {
-            const badge = getStatusBadge(event.status);
+            const lifecycleStatus = getEventStatus(event);
+            const isCompleted = lifecycleStatus === 'completed';
+            const badge = getStatusBadge(lifecycleStatus);
             const StatusIcon = badge.icon;
             const eventFeatures = getEventFeatureDetails(event);
             const venueName = typeof event.venue === 'object' && event.venue
@@ -594,16 +636,16 @@ export default function OrganizerEventsPage() {
             return (
               <div
                 key={event.id}
-                className="bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-indigo-300 transition-colors overflow-hidden"
+                className="bg-surface rounded-2xl border border-border shadow-xs flex flex-col justify-between hover:border-indigo-300 transition-colors overflow-hidden"
               >
                 <div>
                   {/* Card Header & Status */}
-                  <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
+                  <div className="p-5 border-b border-border flex items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700">
+                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-surface-subtle text-text-secondary">
                         {event.category}
                       </span>
-                      <h3 className="font-extrabold text-slate-900 text-base leading-snug line-clamp-1">
+                      <h3 className="font-extrabold text-text-primary text-base leading-snug line-clamp-1">
                         {event.title}
                       </h3>
                     </div>
@@ -617,47 +659,52 @@ export default function OrganizerEventsPage() {
                   </div>
 
                   {/* Card Details */}
-                  <div className="p-5 space-y-3 text-xs text-slate-600">
-                    <p className="line-clamp-2 text-slate-500 leading-relaxed text-[11px]">
+                  <div className="p-5 space-y-3 text-xs text-text-secondary">
+                    <p className="line-clamp-2 text-text-muted leading-relaxed text-[11px]">
                       {event.description}
                     </p>
 
-                    <div className="space-y-2 pt-1 border-t border-slate-100">
+                    <div className="space-y-2 pt-1 border-t border-border">
                       {/* Venue info */}
-                      <div className="flex items-start gap-2 text-slate-700">
+                      <div className="flex items-start gap-2 text-text-secondary">
                         <MapPin className="w-3.5 h-3.5 text-indigo-600 mt-0.5 shrink-0" />
                         <div>
-                          <div className="font-semibold text-slate-900">{venueName}</div>
-                          <div className="text-[11px] text-slate-400">{venueLocation}</div>
+                          <div className="font-semibold text-text-primary">{venueName}</div>
+                          <div className="text-[11px] text-text-muted">{venueLocation}</div>
                         </div>
                       </div>
 
                       {/* Date & Time */}
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <div className="flex items-center gap-2 text-text-secondary">
+                        <Clock className="w-3.5 h-3.5 text-text-muted shrink-0" />
                         <span>{formatDate(event.startDateTime)}</span>
                       </div>
+                      {isCompleted && (
+                        <p className="text-[11px] font-semibold text-text-secondary">
+                          Completed event · Schedule is read-only
+                        </p>
+                      )}
 
                       {/* Headcount Capacity */}
-                      <div className="flex items-center justify-between text-slate-500 text-[11px] pt-1">
+                      <div className="flex items-center justify-between text-text-muted text-[11px] pt-1">
                         <div className="flex items-center gap-1.5">
-                          <Users className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Attendees: <strong className="text-slate-800">{event.registeredCount || 0}</strong> / {event.capacity}</span>
+                          <Users className="w-3.5 h-3.5 text-text-muted" />
+                          <span>Attendees: <strong className="text-text-primary">{event.registeredCount || 0}</strong> / {event.capacity}</span>
                         </div>
-                        <div className="pt-2 border-t border-slate-100 space-y-1 text-[11px]">
+                        <div className="pt-2 border-t border-border space-y-1 text-[11px]">
                           <p>
-                            AICTE points: <strong className="text-slate-800">{eventFeatures.aictePointsAvailable ? 'Yes' : 'No'}</strong>
+                            AICTE points: <strong className="text-text-primary">{eventFeatures.aictePointsAvailable ? 'Yes' : 'No'}</strong>
                           </p>
                           <p>
-                            Attendance provided: <strong className="text-slate-800">{eventFeatures.attendanceProvided ? 'Yes' : 'No'}</strong>
+                            Attendance provided: <strong className="text-text-primary">{eventFeatures.attendanceProvided ? 'Yes' : 'No'}</strong>
                           </p>
                           <p>
-                            Eligible years: <strong className="text-slate-800">{eventFeatures.eligibleYearsLabel}</strong>
+                            Eligible years: <strong className="text-text-primary">{eventFeatures.eligibleYearsLabel}</strong>
                           </p>
                         </div>
                         {event.budget > 0 && (
                           <div className="flex items-center gap-1">
-                            <DollarSign className="w-3 h-3 text-slate-400" />
+                            <DollarSign className="w-3 h-3 text-text-muted" />
                             <span>${event.budget}</span>
                           </div>
                         )}
@@ -670,9 +717,9 @@ export default function OrganizerEventsPage() {
                         {event.tags.slice(0, 3).map((tag, idx) => (
                           <span
                             key={idx}
-                            className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-slate-50 text-[10px] text-slate-500 border border-slate-200/60"
+                            className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-background text-[10px] text-text-muted border border-border"
                           >
-                            <Tag className="w-2.5 h-2.5 text-slate-400" />
+                            <Tag className="w-2.5 h-2.5 text-text-muted" />
                             #{tag}
                           </span>
                         ))}
@@ -682,24 +729,33 @@ export default function OrganizerEventsPage() {
                 </div>
 
                 {/* Card Action Controls */}
-                <div className="p-4 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
+                <div className="p-4 bg-background border-t border-border flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <button
+                      onClick={() => setDetailEvent(event)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-background text-text-secondary font-semibold text-xs shadow-2xs"
+                    >
+                      <span>View Details</span>
+                    </button>
+                    <button
                       onClick={() => handleOpenEditModal(event)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-2xs"
+                      title={isCompleted ? 'Completed event schedules cannot be edited' : 'Edit event'}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-background text-text-secondary font-semibold text-xs shadow-2xs"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                       <span>Edit</span>
                     </button>
 
-                    <Link
-                      to={`/organizer/events/${event.id}/attendees`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs shadow-2xs transition-colors"
-                      title="View Attendee Roster"
-                    >
-                      <Users className="w-3.5 h-3.5" />
-                      <span>Roster ({event.registeredCount || 0})</span>
-                    </Link>
+                    {getEventId(event) && (
+                      <Link
+                        to={`/organizer/events/${getEventId(event)}/attendees`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs shadow-2xs transition-colors"
+                        title="View Attendee Roster"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Roster ({event.registeredCount || 0})</span>
+                      </Link>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5">
@@ -716,7 +772,7 @@ export default function OrganizerEventsPage() {
                     {event.status === 'published' && (
                       <button
                         onClick={() => setConfirmDialog({ type: 'cancel', event })}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 font-semibold text-xs shadow-2xs"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-rose-200 bg-surface hover:bg-rose-50 text-rose-700 font-semibold text-xs shadow-2xs"
                       >
                         <Ban className="w-3.5 h-3.5" />
                         <span>Cancel</span>
@@ -725,7 +781,7 @@ export default function OrganizerEventsPage() {
 
                     <button
                       onClick={() => setConfirmDialog({ type: 'archive', event })}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      className="p-1.5 rounded-lg text-text-muted hover:text-rose-600 hover:bg-rose-50 transition-colors"
                       title="Archive Event"
                     >
                       <Archive className="w-4 h-4" />
@@ -738,23 +794,85 @@ export default function OrganizerEventsPage() {
         </div>
       )}
 
+      {detailEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/40 backdrop-blur-xs">
+          <div className="w-full max-w-xl rounded-2xl bg-surface shadow-2xl border border-border overflow-hidden">
+            <div className="p-5 border-b border-border flex items-start justify-between gap-4">
+              <div>
+                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getStatusBadge(getEventStatus(detailEvent)).classes}`}>
+                  {getStatusBadge(getEventStatus(detailEvent)).label}
+                </span>
+                <h2 className="mt-2 text-lg font-bold text-text-primary">{detailEvent.title}</h2>
+              </div>
+              <button
+                onClick={() => setDetailEvent(null)}
+                className="p-1 text-text-muted hover:text-text-secondary"
+                aria-label="Close event details"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-xs text-text-secondary">
+              <p className="whitespace-pre-line">{detailEvent.description}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <div className="font-semibold text-text-primary">Event date</div>
+                  <div>{formatDate(detailEvent.startDateTime)}</div>
+                </div>
+                <div>
+                  <div className="font-semibold text-text-primary">Venue</div>
+                  <div>{typeof detailEvent.venue === 'object' && detailEvent.venue ? detailEvent.venue.name : 'Venue Unassigned'}</div>
+                  <div>{typeof detailEvent.venue === 'object' && detailEvent.venue ? detailEvent.venue.location : 'Pending Assignment'}</div>
+                </div>
+                <div>
+                  <div className="font-semibold text-text-primary">Attendees</div>
+                  <div>{detailEvent.registeredCount || 0} / {detailEvent.capacity}</div>
+                </div>
+                <div>
+                  <div className="font-semibold text-text-primary">Ends</div>
+                  <div>{detailEvent.endDateTime ? formatDate(detailEvent.endDateTime) : '24 hours after start (inferred)'}</div>
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                {getEventId(detailEvent) && (
+                  <Link
+                    to={`/organizer/events/${getEventId(detailEvent)}/attendees`}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                    onClick={() => setDetailEvent(null)}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    View Attendees
+                  </Link>
+                )}
+                <button
+                  onClick={() => setDetailEvent(null)}
+                  className="rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-secondary hover:bg-background"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CREATE / EDIT EVENT MODAL */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl max-h-[calc(100vh-2rem)] my-4 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/40 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-surface rounded-2xl border border-border shadow-2xl w-full max-w-3xl max-h-[calc(100vh-2rem)] my-4 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-6 border-b border-border flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">
+                <h2 className="text-lg font-bold text-text-primary">
                   {editingEvent ? 'Edit Event Details' : 'Draft New Campus Event'}
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-text-muted mt-0.5">
                   Configure scheduling, capacity, category, and assigned campus venue.
                 </p>
               </div>
               <button
                 onClick={() => setModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-text-muted hover:text-text-secondary p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -777,9 +895,9 @@ export default function OrganizerEventsPage() {
 
             {/* Form */}
             <form onSubmit={handleSubmitForm} className="min-h-0 flex-1 overflow-y-auto p-6 space-y-5 text-xs">
-              <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 space-y-4">
-                <h3 className="text-sm font-bold text-slate-900">1. Basic Event Information</h3>
-                <label className="block font-semibold text-slate-700">
+              <section className="rounded-2xl border border-border bg-background p-4 sm:p-5 space-y-4">
+                <h3 className="text-sm font-bold text-text-primary">1. Basic Event Information</h3>
+                <label className="block font-semibold text-text-secondary">
                   Event Name <span className="text-rose-500">*</span>
                   <input
                     type="text"
@@ -787,10 +905,10 @@ export default function OrganizerEventsPage() {
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="e.g. Annual Campus Robotics Hackathon 2026"
-                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </label>
-                <label className="block font-semibold text-slate-700">
+                <label className="block font-semibold text-text-secondary">
                   Event Description <span className="text-rose-500">*</span>
                   <textarea
                     rows={4}
@@ -798,16 +916,16 @@ export default function OrganizerEventsPage() {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Summarize the agenda, target attendees, and learning objectives..."
-                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-y"
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-y"
                   />
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="block font-semibold text-slate-700">
+                  <label className="block font-semibold text-text-secondary">
                     Event Category <span className="text-rose-500">*</span>
                     <select
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 capitalize focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary capitalize focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     >
                       {EVENT_CATEGORIES.map((cat) => (
                         <option key={cat} value={cat}>
@@ -816,44 +934,45 @@ export default function OrganizerEventsPage() {
                       ))}
                     </select>
                   </label>
-                  <label className="block font-semibold text-slate-700">
+                  <label className="block font-semibold text-text-secondary">
                     Event Tags (comma-separated)
                     <input
                       type="text"
                       value={formData.tags}
                       onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
                       placeholder="e.g. coding, competition, ai"
-                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     />
                   </label>
                 </div>
-                <label className="block font-semibold text-slate-700">
+                <label className="block font-semibold text-text-secondary">
                   Event Banner Image URL (Optional)
                   <input
                     type="url"
                     value={formData.bannerUrl}
                     onChange={(e) => setFormData({ ...formData, bannerUrl: e.target.value })}
                     placeholder="https://example.com/banner.jpg"
-                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </label>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-text-muted">
                   The signed-in organizer account is assigned automatically.
                 </p>
               </section>
 
-              <section className="rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-4">
-                <h3 className="text-sm font-bold text-slate-900">2. Event Schedule</h3>
+              <section className="rounded-2xl border border-border p-4 sm:p-5 space-y-4">
+                <h3 className="text-sm font-bold text-text-primary">2. Event Schedule</h3>
                 {[
-                  { label: 'Start', field: 'startDateTime' },
-                  { label: 'End', field: 'endDateTime' }
+                  { label: 'Start', field: 'startDateTime', required: true },
+                  { label: 'End', field: 'endDateTime', required: false }
                 ].map(({ label, field }) => (
                   <div key={field} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <label className="block font-semibold text-slate-700">
-                      {label} Date <span className="text-rose-500">*</span>
+                    <label className="block font-semibold text-text-secondary">
+                      {label} Date {field === 'startDateTime' && <span className="text-rose-500">*</span>}
                       <input
                         type="date"
-                        required
+                        required={field === 'startDateTime'}
+                        disabled={editingEvent && getEventStatus(editingEvent) === 'completed'}
                         value={getDateTimePart(formData[field], 'date')}
                         onChange={(event) =>
                           setFormData((previous) => ({
@@ -861,14 +980,15 @@ export default function OrganizerEventsPage() {
                             [field]: updateDateTimePart(previous[field], 'date', event.target.value)
                           }))
                         }
-                        className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                       />
                     </label>
-                    <label className="block font-semibold text-slate-700">
-                      {label} Time <span className="text-rose-500">*</span>
+                    <label className="block font-semibold text-text-secondary">
+                      {label} Time {field === 'startDateTime' && <span className="text-rose-500">*</span>}
                       <input
                         type="time"
-                        required
+                        required={field === 'startDateTime'}
+                        disabled={editingEvent && getEventStatus(editingEvent) === 'completed'}
                         value={getDateTimePart(formData[field], 'time')}
                         onChange={(event) =>
                           setFormData((previous) => ({
@@ -876,20 +996,20 @@ export default function OrganizerEventsPage() {
                             [field]: updateDateTimePart(previous[field], 'time', event.target.value)
                           }))
                         }
-                        className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                       />
                     </label>
                   </div>
                 ))}
-                <p className="text-[11px] text-slate-500">
-                  The event end must be later than its start. Times use your local timezone.
+                <p className="text-[11px] text-text-muted">
+                  If no end time is set, the event is treated as ending 24 hours after its start. Published events still need an explicit end time for venue booking. Times use your local timezone.
                 </p>
               </section>
 
-              <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 space-y-4">
-                <h3 className="text-sm font-bold text-slate-900">3. Event Capacity &amp; Registration</h3>
+              <section className="rounded-2xl border border-border bg-background p-4 sm:p-5 space-y-4">
+                <h3 className="text-sm font-bold text-text-primary">3. Event Capacity &amp; Registration</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="block font-semibold text-slate-700">
+                  <label className="block font-semibold text-text-secondary">
                     Maximum Attendees <span className="text-rose-500">*</span>
                     <input
                       type="number"
@@ -897,19 +1017,19 @@ export default function OrganizerEventsPage() {
                       required
                       value={formData.capacity}
                       onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     />
                   </label>
-                  <label className="block font-semibold text-slate-700">
+                  <label className="block font-semibold text-text-secondary">
                     Registration Deadline (Optional)
                     <input
                       type="datetime-local"
                       value={formData.registrationDeadline}
                       onChange={(e) => setFormData({ ...formData, registrationDeadline: e.target.value })}
-                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     />
                   </label>
-                  <label className="block font-semibold text-slate-700 md:col-span-2">
+                  <label className="block font-semibold text-text-secondary md:col-span-2">
                     Event Budget ($ USD, Optional)
                     <input
                       type="number"
@@ -917,15 +1037,15 @@ export default function OrganizerEventsPage() {
                       value={formData.budget}
                       onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
                       placeholder="e.g. 1500"
-                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     />
                   </label>
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-4">
-                <h3 className="text-sm font-bold text-slate-900">4. Venue &amp; Location</h3>
-                <label className="block font-semibold text-slate-700">
+              <section className="rounded-2xl border border-border p-4 sm:p-5 space-y-4">
+                <h3 className="text-sm font-bold text-text-primary">4. Venue &amp; Location</h3>
+                <label className="block font-semibold text-text-secondary">
                   <span className="flex items-center justify-between gap-2">
                     <span>Assigned Campus Venue</span>
                     {venuesLoading && <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" aria-label="Loading venues" />}
@@ -933,7 +1053,7 @@ export default function OrganizerEventsPage() {
                   <select
                     value={formData.venue}
                     onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
-                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   >
                     <option value="">-- No Venue Selected (Draft Pending) --</option>
                     {venues.map((v) => (
@@ -950,18 +1070,18 @@ export default function OrganizerEventsPage() {
                 )}
               </section>
 
-              <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 space-y-4">
-                <h3 className="text-sm font-bold text-slate-900">5. Event Benefits</h3>
+              <section className="rounded-2xl border border-border bg-background p-4 sm:p-5 space-y-4">
+                <h3 className="text-sm font-bold text-text-primary">5. Event Benefits</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[
                     { name: 'aictePointsAvailable', label: 'AICTE Points Provided' },
                     { name: 'attendanceProvided', label: 'Attendance Provided' }
                   ].map((field) => (
-                    <fieldset key={field.name} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
-                      <legend className="px-1 font-semibold text-slate-700">{field.label}</legend>
+                    <fieldset key={field.name} className="rounded-xl border border-border bg-surface p-3 space-y-2">
+                      <legend className="px-1 font-semibold text-text-secondary">{field.label}</legend>
                       <div className="flex items-center gap-6">
                         {[['yes', true], ['no', false]].map(([label, value]) => (
-                          <label key={label} className="inline-flex items-center gap-2 text-slate-600">
+                          <label key={label} className="inline-flex items-center gap-2 text-text-secondary">
                             <input
                               type="radio"
                               name={field.name}
@@ -981,10 +1101,10 @@ export default function OrganizerEventsPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
-                <h3 className="text-sm font-bold text-slate-900">6. Eligible Student Years</h3>
+              <section className="rounded-2xl border border-border p-4 sm:p-5 space-y-3">
+                <h3 className="text-sm font-bold text-text-primary">6. Eligible Student Years</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  <label className="inline-flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-slate-700 font-semibold">
+                  <label className="inline-flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-text-secondary font-semibold">
                     <input
                       type="checkbox"
                       checked={DEFAULT_ELIGIBLE_YEARS.every((year) =>
@@ -1001,7 +1121,7 @@ export default function OrganizerEventsPage() {
                     All Years
                   </label>
                   {STUDENT_YEAR_OPTIONS.map(({ value, label }) => (
-                    <label key={value} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-slate-600">
+                    <label key={value} className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-text-secondary">
                       <input
                         type="checkbox"
                         checked={formData.eligibleYears.includes(value)}
@@ -1019,16 +1139,16 @@ export default function OrganizerEventsPage() {
                     </label>
                   ))}
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-text-muted">
                   “All Years” reflects when all four individual years are selected.
                 </p>
               </section>
 
-              <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5 space-y-4">
+              <section className="rounded-2xl border border-border bg-background p-4 sm:p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">7. Contact &amp; Support</h3>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <h3 className="text-sm font-bold text-text-primary">7. Contact &amp; Support</h3>
+                    <p className="mt-1 text-xs text-text-muted">
                       Add event-specific contacts for participant questions.
                     </p>
                   </div>
@@ -1040,7 +1160,7 @@ export default function OrganizerEventsPage() {
                         contacts: [...previous.contacts, { name: '', role: '', email: '', phone: '' }]
                       }))
                     }
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-surface px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
                   >
                     <Plus className="h-4 w-4" aria-hidden="true" />
                     Add Contact
@@ -1048,9 +1168,9 @@ export default function OrganizerEventsPage() {
                 </div>
 
                 {formData.contacts.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center">
-                    <p className="text-sm font-medium text-slate-600">No contacts added</p>
-                    <p className="mt-1 text-xs text-slate-500">
+                  <div className="rounded-xl border border-dashed border-border-strong bg-surface px-4 py-6 text-center">
+                    <p className="text-sm font-medium text-text-secondary">No contacts added</p>
+                    <p className="mt-1 text-xs text-text-muted">
                       Participant contact details are optional. Add one or more contacts when needed.
                     </p>
                   </div>
@@ -1059,13 +1179,13 @@ export default function OrganizerEventsPage() {
                     {formData.contacts.map((contact, index) => (
                       <fieldset
                         key={index}
-                        className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4 space-y-3"
+                        className="rounded-xl border border-border bg-surface p-3 sm:p-4 space-y-3"
                       >
-                        <legend className="px-1 text-xs font-semibold text-slate-700">
+                        <legend className="px-1 text-xs font-semibold text-text-secondary">
                           Contact {index + 1}
                         </legend>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <label className="block text-xs font-medium text-slate-700">
+                          <label className="block text-xs font-medium text-text-secondary">
                             Name <span className="text-rose-500">*</span>
                             <input
                               type="text"
@@ -1080,10 +1200,10 @@ export default function OrganizerEventsPage() {
                                   )
                                 }))
                               }
-                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                              className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                             />
                           </label>
-                          <label className="block text-xs font-medium text-slate-700">
+                          <label className="block text-xs font-medium text-text-secondary">
                             Role / Designation (Optional)
                             <input
                               type="text"
@@ -1098,10 +1218,10 @@ export default function OrganizerEventsPage() {
                                 }))
                               }
                               placeholder="Event Coordinator"
-                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                              className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                             />
                           </label>
-                          <label className="block text-xs font-medium text-slate-700">
+                          <label className="block text-xs font-medium text-text-secondary">
                             Email <span className="text-rose-500">*</span>
                             <input
                               type="email"
@@ -1116,10 +1236,10 @@ export default function OrganizerEventsPage() {
                                 }))
                               }
                               placeholder="contact@example.edu"
-                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                              className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                             />
                           </label>
-                          <label className="block text-xs font-medium text-slate-700">
+                          <label className="block text-xs font-medium text-text-secondary">
                             Phone (Optional)
                             <input
                               type="tel"
@@ -1133,11 +1253,11 @@ export default function OrganizerEventsPage() {
                                 }))
                               }
                               placeholder="+1 (555) 123-4567"
-                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                              className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                             />
                           </label>
                         </div>
-                        <div className="flex justify-end border-t border-slate-100 pt-2">
+                        <div className="flex justify-end border-t border-border pt-2">
                           <button
                             type="button"
                             onClick={() =>
@@ -1159,18 +1279,18 @@ export default function OrganizerEventsPage() {
                 )}
               </section>
 
-              <section className="rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
+              <section className="rounded-2xl border border-border p-4 sm:p-5 space-y-3">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">8. Official Links</h3>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <h3 className="text-sm font-bold text-text-primary">8. Official Links</h3>
+                  <p className="mt-1 text-xs text-text-muted">
                     Optional links for the event or organizing club.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label className="block text-xs font-medium text-slate-700">
+                  <label className="block text-xs font-medium text-text-secondary">
                     Website URL
-                    <span className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 px-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500">
-                      <Globe className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                    <span className="mt-1 flex items-center gap-2 rounded-xl border border-border px-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500">
+                      <Globe className="h-4 w-4 shrink-0 text-text-muted" aria-hidden="true" />
                       <input
                         type="url"
                         value={formData.websiteUrl}
@@ -1178,14 +1298,14 @@ export default function OrganizerEventsPage() {
                           setFormData((previous) => ({ ...previous, websiteUrl: event.target.value }))
                         }
                         placeholder="https://example.edu/event"
-                        className="min-w-0 w-full py-2 text-slate-800 outline-none"
+                        className="min-w-0 w-full py-2 text-text-primary outline-none"
                       />
                     </span>
                   </label>
-                  <label className="block text-xs font-medium text-slate-700">
+                  <label className="block text-xs font-medium text-text-secondary">
                     Instagram URL
-                    <span className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 px-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500">
-                      <Instagram className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                    <span className="mt-1 flex items-center gap-2 rounded-xl border border-border px-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500">
+                      <Instagram className="h-4 w-4 shrink-0 text-text-muted" aria-hidden="true" />
                       <input
                         type="url"
                         value={formData.instagramUrl}
@@ -1193,13 +1313,13 @@ export default function OrganizerEventsPage() {
                           setFormData((previous) => ({ ...previous, instagramUrl: event.target.value }))
                         }
                         placeholder="https://www.instagram.com/eventclub"
-                        className="min-w-0 w-full py-2 text-slate-800 outline-none"
+                        className="min-w-0 w-full py-2 text-text-primary outline-none"
                       />
                     </span>
                   </label>
-                  <label className="block text-xs font-medium text-slate-700 sm:col-span-2">
+                  <label className="block text-xs font-medium text-text-secondary sm:col-span-2">
                     WhatsApp Group Invite URL
-                    <span className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 px-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500">
+                    <span className="mt-1 flex items-center gap-2 rounded-xl border border-border px-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500">
                       <span className="text-emerald-600 font-bold" aria-hidden="true">WA</span>
                       <input
                         type="url"
@@ -1212,10 +1332,10 @@ export default function OrganizerEventsPage() {
                         }
                         placeholder="https://chat.whatsapp.com/..."
                         aria-label="WhatsApp Group Invite URL"
-                        className="min-w-0 w-full py-2 text-slate-800 outline-none"
+                        className="min-w-0 w-full py-2 text-text-primary outline-none"
                       />
                     </span>
-                    <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                    <span className="mt-1 block text-[11px] font-normal text-text-muted">
                       Optional. Only participants with an active event registration can access this link.
                     </span>
                   </label>
@@ -1223,13 +1343,13 @@ export default function OrganizerEventsPage() {
               </section>
 
               {/* Modal Action Buttons */}
-              <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <h3 className="text-sm font-bold text-slate-900">9. Final Actions</h3>
+              <div className="pt-4 border-t border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <h3 className="text-sm font-bold text-text-primary">9. Final Actions</h3>
                 <div className="flex items-center justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
+                    className="px-4 py-2.5 rounded-xl border border-border-strong bg-surface text-text-secondary font-semibold hover:bg-background transition-colors"
                   >
                     Cancel
                   </button>
@@ -1250,21 +1370,21 @@ export default function OrganizerEventsPage() {
 
       {/* CONFIRMATION MODAL */}
       {confirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/40 backdrop-blur-xs">
+          <div className="bg-surface rounded-2xl border border-border shadow-2xl w-full max-w-md p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
               {confirmDialog.type === 'publish' && <Send className="w-5 h-5 text-emerald-600" />}
               {confirmDialog.type === 'cancel' && <Ban className="w-5 h-5 text-rose-600" />}
-              {confirmDialog.type === 'archive' && <Archive className="w-5 h-5 text-slate-600" />}
+              {confirmDialog.type === 'archive' && <Archive className="w-5 h-5 text-text-secondary" />}
             </div>
 
-            <h3 className="font-extrabold text-slate-900 text-base mb-1">
+            <h3 className="font-extrabold text-text-primary text-base mb-1">
               {confirmDialog.type === 'publish' && 'Publish Campus Event?'}
               {confirmDialog.type === 'cancel' && 'Cancel Event?'}
               {confirmDialog.type === 'archive' && 'Archive Event?'}
             </h3>
 
-            <p className="text-xs text-slate-500 leading-relaxed mb-6">
+            <p className="text-xs text-text-muted leading-relaxed mb-6">
               {confirmDialog.type === 'publish' &&
                 `Publishing "${confirmDialog.event.title}" will make it visible to all participants and enable ticket registrations.`}
               {confirmDialog.type === 'cancel' &&
@@ -1277,7 +1397,7 @@ export default function OrganizerEventsPage() {
               <button
                 type="button"
                 onClick={() => setConfirmDialog(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-semibold text-xs hover:bg-slate-50"
+                className="px-4 py-2 rounded-xl border border-border text-text-secondary font-semibold text-xs hover:bg-background"
               >
                 Go Back
               </button>
@@ -1290,7 +1410,7 @@ export default function OrganizerEventsPage() {
                     ? 'bg-emerald-600 hover:bg-emerald-700'
                     : confirmDialog.type === 'cancel'
                     ? 'bg-rose-600 hover:bg-rose-700'
-                    : 'bg-slate-800 hover:bg-slate-900'
+                    : 'bg-primary hover:bg-primary/90'
                 }`}
               >
                 {actionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

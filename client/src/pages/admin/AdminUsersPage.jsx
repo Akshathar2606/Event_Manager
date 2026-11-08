@@ -127,16 +127,16 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <header className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <header className="bg-surface rounded-2xl border border-border p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
             <Shield className="w-3.5 h-3.5" />
             Administrator Portal
           </span>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="mt-2 text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
             User Directory
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-text-muted">
             Search accounts and manage access. Account roles and historical records are preserved.
           </p>
         </div>
@@ -144,7 +144,7 @@ export default function AdminUsersPage() {
           type="button"
           onClick={handleRefresh}
           disabled={loading}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-text-secondary bg-surface border border-border hover:bg-background disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -170,17 +170,17 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <section className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden">
+        <div className="p-4 border-b border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <label className="sm:col-span-2 relative">
             <span className="sr-only">Search users by name or email</span>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
             <input
               type="search"
               value={search}
               onChange={handleFilterChange(setSearch)}
               placeholder="Search name or email..."
-              className="block w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
+              className="block w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-border bg-surface focus:outline-hidden focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600"
             />
           </label>
           <label>
@@ -188,7 +188,7 @@ export default function AdminUsersPage() {
             <select
               value={roleFilter}
               onChange={handleFilterChange(setRoleFilter)}
-              className="block w-full py-2 px-3 text-sm rounded-xl border border-slate-200 bg-white text-slate-700"
+              className="block w-full py-2 px-3 text-sm rounded-xl border border-border bg-surface text-text-secondary"
             >
               <option value="">All roles</option>
               {USER_ROLES.map((role) => (
@@ -201,7 +201,7 @@ export default function AdminUsersPage() {
             <select
               value={activeFilter}
               onChange={handleFilterChange(setActiveFilter)}
-              className="block w-full py-2 px-3 text-sm rounded-xl border border-slate-200 bg-white text-slate-700"
+              className="block w-full py-2 px-3 text-sm rounded-xl border border-border bg-surface text-text-secondary"
             >
               <option value="">All statuses</option>
               <option value="true">Active</option>
@@ -210,14 +210,14 @@ export default function AdminUsersPage() {
           </label>
         </div>
 
-        <div className="px-4 py-3 bg-slate-50/60 border-b border-slate-100 text-sm text-slate-600">
-          <span className="font-semibold text-slate-900">{pagination.total}</span>{' '}
+        <div className="px-4 py-3 bg-background border-b border-border text-sm text-text-secondary">
+          <span className="font-semibold text-text-primary">{pagination.total}</span>{' '}
           {pagination.total === 1 ? 'user' : 'users'} total
-          <span className="mx-2 text-slate-300">|</span>
-          Page <span className="font-semibold text-slate-900">{pagination.page}</span> of{' '}
-          <span className="font-semibold text-slate-900">{pagination.pages}</span>
+          <span className="mx-2 text-text-muted">|</span>
+          Page <span className="font-semibold text-text-primary">{pagination.page}</span> of{' '}
+          <span className="font-semibold text-text-primary">{pagination.pages}</span>
           {pagination.total > 0 && (
-            <span className="ml-2 text-slate-500">
+            <span className="ml-2 text-text-muted">
               (showing {(pagination.page - 1) * pagination.limit + 1}–
               {Math.min(pagination.page * pagination.limit, pagination.total)})
             </span>
@@ -225,19 +225,19 @@ export default function AdminUsersPage() {
         </div>
 
         {directoryView === 'loading' ? (
-          <div className="py-16 flex flex-col items-center text-slate-500" role="status">
+          <div className="py-16 flex flex-col items-center text-text-muted" role="status">
             <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mb-3" />
             <span className="text-sm">Loading users...</span>
           </div>
         ) : directoryView === 'error' ? (
-          <div className="py-12 text-center text-sm text-slate-500">
+          <div className="py-12 text-center text-sm text-text-muted">
             User list could not be loaded. Retry to try again.
           </div>
         ) : directoryView === 'empty' ? (
           <div className="py-16 text-center">
-            <UserCheck className="w-10 h-10 mx-auto text-slate-300 mb-3" />
-            <h2 className="font-semibold text-slate-800">No users found</h2>
-            <p className="mt-1 text-sm text-slate-500">Try changing your search or filters.</p>
+            <UserCheck className="w-10 h-10 mx-auto text-text-muted mb-3" />
+            <h2 className="font-semibold text-text-primary">No users found</h2>
+            <p className="mt-1 text-sm text-text-muted">Try changing your search or filters.</p>
             {(search || roleFilter || activeFilter) && (
               <button
                 type="button"
@@ -256,7 +256,7 @@ export default function AdminUsersPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="bg-background text-xs uppercase tracking-wide text-text-muted">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-semibold">User</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Role</th>
@@ -268,10 +268,10 @@ export default function AdminUsersPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {users.map((account) => (
-                  <tr key={account.id} className="hover:bg-slate-50/60">
+                  <tr key={account.id} className="hover:bg-background">
                     <td className="px-4 py-4">
-                      <div className="font-semibold text-slate-900">{account.name || 'Unnamed user'}</div>
-                      <div className="text-xs text-slate-500 break-all">{account.email}</div>
+                      <div className="font-semibold text-text-primary">{account.name || 'Unnamed user'}</div>
+                      <div className="text-xs text-text-muted break-all">{account.email}</div>
                     </td>
                     <td className="px-4 py-4">
                       <span className="inline-flex px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold capitalize">
@@ -282,16 +282,16 @@ export default function AdminUsersPage() {
                       <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border ${
                         account.isActive
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                          : 'bg-surface-subtle text-text-secondary border-border'
                       }`}>
                         {account.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-xs text-slate-600">
+                    <td className="px-4 py-4 text-xs text-text-secondary">
                       <div>{account.organization || '—'}</div>
-                      {account.phone && <div className="mt-1 text-slate-400">{account.phone}</div>}
+                      {account.phone && <div className="mt-1 text-text-muted">{account.phone}</div>}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-xs text-slate-600">
+                    <td className="px-4 py-4 whitespace-nowrap text-xs text-text-secondary">
                       {formatUserCreationDate(account.createdAt)}
                     </td>
                     <td className="px-4 py-4 text-right">
@@ -300,7 +300,7 @@ export default function AdminUsersPage() {
                           type="button"
                           disabled
                           title="You cannot deactivate your own account."
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-text-muted bg-background cursor-not-allowed"
                         >
                           <UserX className="w-3.5 h-3.5" />
                           Your account
@@ -334,12 +334,12 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        <footer className="py-3 px-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs text-slate-600">
+        <footer className="py-3 px-4 border-t border-border bg-background flex items-center justify-between text-xs text-text-secondary">
           <button
             type="button"
             onClick={() => setPage(pageNavigation.previousPage)}
             disabled={pagination.page <= 1 || loading}
-            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white font-medium hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-border bg-surface font-medium hover:bg-background disabled:opacity-50"
           >
             <ChevronLeft className="w-4 h-4" /> Previous
           </button>
@@ -348,7 +348,7 @@ export default function AdminUsersPage() {
             type="button"
             onClick={() => setPage(pageNavigation.nextPage)}
             disabled={pagination.page >= pagination.pages || loading}
-            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white font-medium hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-border bg-surface font-medium hover:bg-background disabled:opacity-50"
           >
             Next <ChevronRight className="w-4 h-4" />
           </button>
@@ -356,19 +356,19 @@ export default function AdminUsersPage() {
       </section>
 
       {confirmationUser && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-overlay/40 backdrop-blur-xs flex items-center justify-center p-4">
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="user-status-confirmation-title"
-            className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6"
+            className="bg-surface rounded-2xl border border-border shadow-xl max-w-md w-full p-6"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 id="user-status-confirmation-title" className="text-lg font-bold text-slate-900">
+                <h2 id="user-status-confirmation-title" className="text-lg font-bold text-text-primary">
                   {confirmationUser.isActive ? 'Deactivate account?' : 'Activate account?'}
                 </h2>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-text-secondary">
                   {confirmationUser.isActive
                     ? `This will prevent ${confirmationUser.name || confirmationUser.email} from signing in. Their role and historical records will remain unchanged.`
                     : `This will allow ${confirmationUser.name || confirmationUser.email} to sign in again.`}
@@ -379,7 +379,7 @@ export default function AdminUsersPage() {
                 aria-label="Close confirmation"
                 disabled={actionLoading}
                 onClick={() => setConfirmationUser(null)}
-                className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-50"
+                className="p-1 text-text-muted hover:text-text-secondary disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -394,7 +394,7 @@ export default function AdminUsersPage() {
                 type="button"
                 disabled={actionLoading}
                 onClick={() => setConfirmationUser(null)}
-                className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg border border-border text-sm font-semibold text-text-secondary hover:bg-background disabled:opacity-50"
               >
                 Cancel
               </button>

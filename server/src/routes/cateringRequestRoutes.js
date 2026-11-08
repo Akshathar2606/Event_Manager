@@ -10,6 +10,7 @@ const {
 } = require('../controllers/cateringRequestController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
+const { requireApprovedVendor } = require('../middleware/vendorApprovalMiddleware');
 
 const router = express.Router();
 
@@ -17,19 +18,19 @@ const router = express.Router();
 router.post('/', verifyToken, authorizeRoles('organizer'), createCateringRequest);
 
 // 2. Organizer Personal Requests Listing (Organizers view own; Administrators can inspect)
-router.get('/', verifyToken, authorizeRoles('organizer', 'administrator'), getOrganizerCateringRequests);
+router.get('/', verifyToken, requireApprovedVendor, authorizeRoles('organizer', 'administrator'), getOrganizerCateringRequests);
 
 // 3. Vendor Incoming Requests Listing (Vendors view own; Administrators can inspect)
-router.get('/incoming', verifyToken, authorizeRoles('vendor', 'administrator'), getVendorCateringRequests);
+router.get('/incoming', verifyToken, requireApprovedVendor, authorizeRoles('vendor', 'administrator'), getVendorCateringRequests);
 
 // 4. Single Request Detail: Accessible by the request organizer, recipient vendor, or admin
-router.get('/:id', verifyToken, getCateringRequestById);
+router.get('/:id', verifyToken, requireApprovedVendor, getCateringRequestById);
 
 // 5. Vendor Decisions: Strictly restricted to assigned Vendor (Administrators cannot decide)
-router.patch('/:id/accept', verifyToken, authorizeRoles('vendor'), acceptCateringRequest);
-router.patch('/:id/reject', verifyToken, authorizeRoles('vendor'), rejectCateringRequest);
+router.patch('/:id/accept', verifyToken, authorizeRoles('vendor'), requireApprovedVendor, acceptCateringRequest);
+router.patch('/:id/reject', verifyToken, authorizeRoles('vendor'), requireApprovedVendor, rejectCateringRequest);
 
 // 6. Organizer Cancellation: Strictly restricted to Event Organizer
-router.patch('/:id/cancel', verifyToken, authorizeRoles('organizer'), cancelCateringRequest);
+router.patch('/:id/cancel', verifyToken, requireApprovedVendor, authorizeRoles('organizer'), cancelCateringRequest);
 
 module.exports = router;

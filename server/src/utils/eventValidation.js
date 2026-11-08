@@ -279,9 +279,7 @@ const validateEventInput = (input, isUpdate = false, existingEvent = null) => {
 
   // End Date
   if (endDateTime !== undefined) {
-    if (!endDateTime) {
-      errors.push('Event end date and time is required.');
-    } else {
+    if (endDateTime !== null && endDateTime !== '') {
       parsedEnd = new Date(endDateTime);
       if (isNaN(parsedEnd.getTime())) {
         errors.push('Invalid event end date and time format.');
@@ -289,8 +287,6 @@ const validateEventInput = (input, isUpdate = false, existingEvent = null) => {
     }
   } else if (existingEvent && existingEvent.endDateTime) {
     parsedEnd = new Date(existingEvent.endDateTime);
-  } else if (!isUpdate) {
-    errors.push('Event end date and time is required.');
   }
 
   // Registration Deadline
@@ -407,7 +403,9 @@ const validateEventInput = (input, isUpdate = false, existingEvent = null) => {
   if ((!isUpdate || startDateTime !== undefined) && parsedStart && !isNaN(parsedStart.getTime())) {
     sanitized.startDateTime = parsedStart;
   }
-  if ((!isUpdate || endDateTime !== undefined) && parsedEnd && !isNaN(parsedEnd.getTime())) {
+  if (endDateTime !== undefined) {
+    sanitized.endDateTime = parsedEnd && !isNaN(parsedEnd.getTime()) ? parsedEnd : null;
+  } else if (!isUpdate && parsedEnd && !isNaN(parsedEnd.getTime())) {
     sanitized.endDateTime = parsedEnd;
   }
   if (registrationDeadline !== undefined) {

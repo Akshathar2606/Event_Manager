@@ -91,6 +91,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const clearError = () => setAuthError(null);
+  const updateUser = useCallback((updatedUser) => {
+    setUser((currentUser) => currentUser ? { ...currentUser, ...updatedUser } : currentUser);
+  }, []);
 
   const value = {
     user,
@@ -113,8 +116,9 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    updateUser,
     clearError,
-    getHomePath: () => getRoleHomePath(user?.role),
+    getHomePath: () => getRoleHomePath(user?.role, user?.vendorApplicationStatus),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

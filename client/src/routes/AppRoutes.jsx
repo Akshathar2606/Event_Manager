@@ -13,6 +13,7 @@ import UnauthorizedPage from '../pages/auth/UnauthorizedPage';
 import NotFoundPage from '../pages/NotFoundPage';
 
 import AdminDashboard from '../pages/admin/AdminDashboard';
+import AdminEventsPage from '../pages/admin/AdminEventsPage';
 import AdminVenuesPage from '../pages/admin/AdminVenuesPage';
 import AdminBookingsPage from '../pages/admin/AdminBookingsPage';
 import AdminUsersPage from '../pages/admin/AdminUsersPage';
@@ -30,20 +31,24 @@ import VendorDashboard from '../pages/vendor/VendorDashboard';
 import VendorProfilePage from '../pages/vendor/VendorProfilePage';
 import VendorPackagesPage from '../pages/vendor/VendorPackagesPage';
 import VendorCateringRequestsPage from '../pages/vendor/VendorCateringRequestsPage';
+import VendorApplicationStatusPage from '../pages/vendor/VendorApplicationStatusPage';
+import AdminVendorApplicationsPage from '../pages/admin/AdminVendorApplicationsPage';
+import UserProfilePage from '../pages/profile/UserProfilePage';
+import LandingPage from '../pages/public/LandingPage';
+import { USER_ROLES } from '../utils/roles';
 import { Loader2 } from 'lucide-react';
 
 /**
- * Root index redirector: Sends authenticated users to their role-specific dashboard,
- * or unauthenticated users to /login.
+ * Authenticated users go to their role workspace; public visitors see the landing page.
  */
 function RootIndexRedirect() {
   const { isAuthenticated, loading, getHomePath } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-3" />
-        <p className="text-sm text-slate-500 font-medium">Loading EventFlow...</p>
+        <p className="text-sm text-text-muted font-medium">Loading EventFlow...</p>
       </div>
     );
   }
@@ -52,7 +57,7 @@ function RootIndexRedirect() {
     return <Navigate to={getHomePath()} replace />;
   }
 
-  return <Navigate to="/login" replace />;
+  return <LandingPage />;
 }
 
 /**
@@ -63,7 +68,7 @@ function PublicOnlyRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-3" />
       </div>
     );
@@ -73,6 +78,17 @@ function PublicOnlyRoute({ children }) {
     return <Navigate to={getHomePath()} replace />;
   }
 
+  return children;
+}
+
+function VendorApprovalRoute({ children }) {
+  const { user } = useAuth();
+  if (
+    user?.role === 'vendor' &&
+    user.vendorApplicationStatus !== 'approved'
+  ) {
+    return <Navigate to="/vendor/application-status" replace />;
+  }
   return children;
 }
 
@@ -111,6 +127,19 @@ export default function AppRoutes() {
       {/* Access Denied / 403 Page */}
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={USER_ROLES}>
+              <AppLayout />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<UserProfilePage />} />
+      </Route>
+
       {/* Protected Administrator Routes */}
       <Route
         path="/admin"
@@ -123,9 +152,11 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<AdminDashboard />} />
+        <Route path="events" element={<AdminEventsPage />} />
         <Route path="venues" element={<AdminVenuesPage />} />
         <Route path="bookings" element={<AdminBookingsPage />} />
         <Route path="users" element={<AdminUsersPage />} />
+        <Route path="vendor-applications" element={<AdminVendorApplicationsPage />} />
       </Route>
 
       {/* Protected Organizer Routes (Supervisable by Administrator) */}
@@ -166,13 +197,26 @@ export default function AppRoutes() {
         <Route path="profile" element={<ParticipantDashboard />} />
       </Route>
 
+      <Route
+        path="/vendor/application-status"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['vendor']}>
+              <VendorApplicationStatusPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Protected Catering Vendor Routes */}
       <Route
         path="/vendor"
         element={
           <ProtectedRoute>
             <RoleRoute allowedRoles={['vendor', 'administrator']}>
-              <AppLayout />
+              <VendorApprovalRoute>
+                <AppLayout />
+              </VendorApprovalRoute>
             </RoleRoute>
           </ProtectedRoute>
         }

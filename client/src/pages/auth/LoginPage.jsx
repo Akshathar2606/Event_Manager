@@ -59,29 +59,30 @@ export default function LoginPage() {
       // If user came from a protected page, return them there; otherwise, route to role home
       const destination = getPostLoginPath(
         result.user?.role,
-        location.state?.from?.pathname
+        location.state?.from?.pathname,
+        result.user?.vendorApplicationStatus
       );
       navigate(destination, { replace: true });
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <Link to="/" className="inline-flex items-center gap-2 mb-4">
           <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-indigo-200">
             EF
           </div>
-          <span className="font-extrabold text-2xl text-slate-900 tracking-tight">EventFlow</span>
+          <span className="font-extrabold text-2xl text-text-primary tracking-tight">EventFlow</span>
         </Link>
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <h2 className="text-2xl font-bold text-text-primary tracking-tight">Welcome back</h2>
+        <p className="mt-1 text-sm text-text-muted">
           Sign in to manage venues, book catering, or explore campus events
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
-        <div className="bg-white py-8 px-6 sm:px-10 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-surface py-8 px-6 sm:px-10 rounded-2xl border border-border shadow-sm">
           {/* Server Error Alert */}
           {authError && (
             <div
@@ -96,11 +97,11 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label htmlFor="email" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
                 Email Address
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
@@ -111,10 +112,10 @@ export default function LoginPage() {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="you@institution.edu"
-                  className={`block w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border bg-white text-slate-900 placeholder:text-slate-400 transition-colors focus:outline-hidden focus:ring-2 ${
+                  className={`block w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border bg-surface text-text-primary placeholder:text-text-muted transition-colors focus:outline-hidden focus:ring-2 ${
                     clientErrors.email
                       ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
-                      : 'border-slate-200 focus:border-indigo-600 focus:ring-indigo-100'
+                      : 'border-border focus:border-indigo-600 focus:ring-indigo-100'
                   }`}
                   aria-invalid={Boolean(clientErrors.email)}
                   aria-describedby={clientErrors.email ? 'email-error' : undefined}
@@ -130,7 +131,7 @@ export default function LoginPage() {
             {/* Password Field */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="password" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                <label htmlFor="password" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider">
                   Password
                 </label>
                 <Link
@@ -141,7 +142,7 @@ export default function LoginPage() {
                 </Link>
               </div>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
@@ -152,10 +153,10 @@ export default function LoginPage() {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Enter your password"
-                  className={`block w-full pl-9 pr-10 py-2.5 text-sm rounded-xl border bg-white text-slate-900 placeholder:text-slate-400 transition-colors focus:outline-hidden focus:ring-2 ${
+                  className={`block w-full pl-9 pr-10 py-2.5 text-sm rounded-xl border bg-surface text-text-primary placeholder:text-text-muted transition-colors focus:outline-hidden focus:ring-2 ${
                     clientErrors.password
                       ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200'
-                      : 'border-slate-200 focus:border-indigo-600 focus:ring-indigo-100'
+                      : 'border-border focus:border-indigo-600 focus:ring-indigo-100'
                   }`}
                   aria-invalid={Boolean(clientErrors.password)}
                   aria-describedby={clientErrors.password ? 'password-error' : undefined}
@@ -163,7 +164,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-hidden"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-muted hover:text-text-secondary focus:outline-hidden"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -197,8 +198,8 @@ export default function LoginPage() {
           </form>
 
           {/* Registration Link */}
-          <div className="mt-6 pt-5 border-t border-slate-100 text-center">
-            <p className="text-sm text-slate-500">
+          <div className="mt-6 pt-5 border-t border-border text-center">
+            <p className="text-sm text-text-muted">
               Don&apos;t have an account yet?{' '}
               <Link
                 to="/register"

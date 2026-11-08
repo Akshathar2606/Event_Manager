@@ -171,7 +171,7 @@ export default function ParticipantRegistrationsPage() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-xs">
+      <div className="bg-surface rounded-2xl border border-border p-6 sm:p-8 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
@@ -180,10 +180,10 @@ export default function ParticipantRegistrationsPage() {
                 Participant Portal
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
               My Event Registrations
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-text-muted">
               Manage your confirmed admission passes, schedule details, and ticket status.
             </p>
           </div>
@@ -233,7 +233,7 @@ export default function ParticipantRegistrationsPage() {
       )}
 
       {/* Filter and Tab Navigation Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+      <div className="bg-surface rounded-2xl border border-border p-4 shadow-xs">
         <div className="flex items-center gap-2 overflow-x-auto text-xs">
           {[
             { id: 'all', label: 'All Registrations' },
@@ -246,7 +246,7 @@ export default function ParticipantRegistrationsPage() {
               className={`px-3 py-1.5 rounded-lg font-semibold transition-colors shrink-0 ${
                 activeTab === tab.id
                   ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  : 'text-text-secondary hover:bg-surface-subtle'
               }`}
             >
               {tab.label}
@@ -257,21 +257,21 @@ export default function ParticipantRegistrationsPage() {
 
       {/* Registrations List */}
       {loading ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center shadow-xs">
           <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-3" />
-          <p className="text-xs text-slate-500 font-medium">Loading your admission tickets...</p>
+          <p className="text-xs text-text-muted font-medium">Loading your admission tickets...</p>
         </div>
       ) : registrations.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
+        <div className="bg-surface rounded-2xl border border-border p-12 text-center shadow-xs">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-4">
             <Ticket className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-bold text-slate-900">
+          <h3 className="text-base font-bold text-text-primary">
             {activeTab === 'all'
               ? 'No event registrations yet'
               : `No ${activeTab} registrations found`}
           </h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-5">
+          <p className="text-xs text-text-muted max-w-sm mx-auto mt-1 mb-5">
             {activeTab === 'all'
               ? 'You have not registered for any campus events yet. Explore upcoming hackathons, conferences, and seminars to reserve your spot.'
               : `You have no tickets currently matching the "${activeTab}" status filter.`}
@@ -304,11 +304,11 @@ export default function ParticipantRegistrationsPage() {
             return (
               <div
                 key={regId}
-                className="w-full min-w-0 space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition-colors hover:border-indigo-300 sm:p-5"
+                className="w-full min-w-0 space-y-4 rounded-2xl border border-border bg-surface p-4 shadow-xs transition-colors hover:border-indigo-300 sm:p-5"
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   {event.category && (
-                    <span className="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                    <span className="inline-block rounded-full bg-surface-subtle px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
                       {event.category}
                     </span>
                   )}
@@ -318,42 +318,47 @@ export default function ParticipantRegistrationsPage() {
                     <StatusIcon className="h-3 w-3 shrink-0" />
                     <span>{badge.label}</span>
                   </span>
-                  <span className="text-[11px] text-slate-400">
-                    Ref: <code className="font-mono text-slate-600">{String(regId).slice(-6).toUpperCase()}</code>
+                  {event.lifecycleStatus && (
+                    <span className="inline-flex items-center rounded-full border border-border bg-background px-2.5 py-0.5 text-[11px] font-semibold capitalize text-text-secondary">
+                      {event.lifecycleStatus}
+                    </span>
+                  )}
+                  <span className="text-[11px] text-text-muted">
+                    Ref: <code className="font-mono text-text-secondary">{String(regId).slice(-6).toUpperCase()}</code>
                   </span>
                 </div>
 
-                <h3 className="min-w-0 break-words text-lg font-extrabold leading-snug text-slate-900 sm:text-xl">
+                <h3 className="min-w-0 break-words text-lg font-extrabold leading-snug text-text-primary sm:text-xl">
                   {event.title || 'Untitled Event'}
                 </h3>
 
-                <div className="grid min-w-0 grid-cols-1 gap-4 text-xs text-slate-600 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid min-w-0 grid-cols-1 gap-4 text-xs text-text-secondary sm:grid-cols-2 xl:grid-cols-3">
                   <div className="flex min-w-0 items-start gap-2">
                     <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
                     <div className="min-w-0">
-                      <div className="break-words font-medium text-slate-800">
+                      <div className="break-words font-medium text-text-primary">
                         {formatDisplayDate(event.startDateTime)}
                       </div>
-                      <div className="break-words text-[11px] text-slate-400">
-                        {formatDisplayTime(event.startDateTime)} – {formatDisplayTime(event.endDateTime)}
+                      <div className="break-words text-[11px] text-text-muted">
+                        {formatDisplayTime(event.startDateTime)} – {formatDisplayTime(event.endDateTime) || '24 hours after start'}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex min-w-0 items-start gap-2">
-                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
                     <div className="min-w-0">
-                      <div className="break-words font-medium text-slate-800">
+                      <div className="break-words font-medium text-text-primary">
                         {venue.name || 'Campus Venue'}
                       </div>
-                      <div className="break-words text-[11px] text-slate-400">
+                      <div className="break-words text-[11px] text-text-muted">
                         {venue.location || 'Location TBA'}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex min-w-0 items-start gap-2">
-                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
                     <div className="min-w-0 break-words">
                       {isCancelled ? (
                         <>
@@ -361,14 +366,14 @@ export default function ParticipantRegistrationsPage() {
                             Cancelled on {formatDisplayDate(reg.cancelledAt)}
                           </div>
                           {reg.cancellationReason && (
-                            <div className="break-words text-[11px] text-slate-400">
+                            <div className="break-words text-[11px] text-text-muted">
                               Reason: {reg.cancellationReason}
                             </div>
                           )}
                         </>
                       ) : (
                         <>
-                          <div className="font-medium text-slate-800">
+                          <div className="font-medium text-text-primary">
                             Registered: {formatDisplayDate(reg.createdAt)}
                           </div>
                           <div className="text-[11px] font-semibold text-emerald-600">Seat Confirmed</div>
@@ -387,10 +392,10 @@ export default function ParticipantRegistrationsPage() {
                           aria-hidden="true"
                         />
                         <div className="min-w-0 flex-1">
-                          <h4 className="break-words text-sm font-bold text-slate-900">
+                          <h4 className="break-words text-sm font-bold text-text-primary">
                             Stay Updated on WhatsApp
                           </h4>
-                          <p className="mt-1 break-words text-xs leading-relaxed text-slate-600">
+                          <p className="mt-1 break-words text-xs leading-relaxed text-text-secondary">
                             Join the official event group for announcements, schedule changes, and important updates.
                           </p>
                         </div>
@@ -414,10 +419,10 @@ export default function ParticipantRegistrationsPage() {
                   </p>
                 )}
 
-                <div className="flex min-w-0 flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+                <div className="flex min-w-0 flex-wrap justify-end gap-2 border-t border-border pt-4">
                   <button
                     onClick={() => setDetailModalRegistration(reg)}
-                    className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:bg-slate-50"
+                    className="min-w-0 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-secondary shadow-2xs transition-colors hover:bg-background"
                   >
                     View Details
                   </button>
@@ -434,7 +439,7 @@ export default function ParticipantRegistrationsPage() {
                       }
                       className={`min-w-0 rounded-xl px-3 py-2 text-xs font-semibold shadow-2xs transition-colors ${
                         eventStarted
-                          ? 'cursor-not-allowed select-none border border-slate-200 bg-slate-100 text-slate-400'
+                          ? 'cursor-not-allowed select-none border border-border bg-surface-subtle text-text-muted'
                           : 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
                       }`}
                     >
@@ -448,16 +453,16 @@ export default function ParticipantRegistrationsPage() {
 
           {/* Pagination Controls */}
           {pagination.pages > 1 && (
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs flex items-center justify-between text-xs text-slate-600">
+            <div className="bg-surface rounded-2xl border border-border p-4 shadow-xs flex items-center justify-between text-xs text-text-secondary">
               <div>
-                Showing page <strong className="text-slate-800">{pagination.page}</strong> of{' '}
-                <strong className="text-slate-800">{pagination.pages}</strong> ({pagination.total} registrations)
+                Showing page <strong className="text-text-primary">{pagination.page}</strong> of{' '}
+                <strong className="text-text-primary">{pagination.pages}</strong> ({pagination.total} registrations)
               </div>
               <div className="flex items-center gap-2">
                 <button
                   disabled={pagination.page <= 1 || loading}
                   onClick={() => fetchRegistrations(pagination.page - 1)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-background text-text-secondary disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   <span>Previous</span>
@@ -465,7 +470,7 @@ export default function ParticipantRegistrationsPage() {
                 <button
                   disabled={pagination.page >= pagination.pages || loading}
                   onClick={() => fetchRegistrations(pagination.page + 1)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-background text-text-secondary disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <span>Next</span>
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -488,10 +493,10 @@ export default function ParticipantRegistrationsPage() {
         const eventStarted = isEventStarted(event.startDateTime);
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs overflow-y-auto">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/40 backdrop-blur-xs overflow-y-auto">
+            <div className="bg-surface rounded-2xl border border-border shadow-2xl w-full max-w-lg my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
               {/* Header */}
-              <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4">
+              <div className="p-6 border-b border-border flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1.5">
                     <span
@@ -500,38 +505,38 @@ export default function ParticipantRegistrationsPage() {
                       <StatusIcon className="w-3 h-3" />
                       <span>{badge.label}</span>
                     </span>
-                    <span className="text-xs text-slate-400">
-                      ID: <code className="font-mono text-slate-700">{regId}</code>
+                    <span className="text-xs text-text-muted">
+                      ID: <code className="font-mono text-text-secondary">{regId}</code>
                     </span>
                   </div>
-                  <h2 className="text-lg font-bold text-slate-900">{event.title}</h2>
+                  <h2 className="text-lg font-bold text-text-primary">{event.title}</h2>
                 </div>
                 <button
                   onClick={() => setDetailModalRegistration(null)}
-                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                  className="text-text-muted hover:text-text-secondary p-1 rounded-lg"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Body */}
-              <div className="p-6 space-y-4 text-xs text-slate-600 max-h-[70vh] overflow-y-auto">
+              <div className="p-6 space-y-4 text-xs text-text-secondary max-h-[70vh] overflow-y-auto">
                 {/* Event Schedule */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-                  <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                <div className="p-4 rounded-xl bg-background border border-border space-y-2">
+                  <h4 className="font-bold text-text-primary flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-indigo-600" />
                     <span>Schedule</span>
                   </h4>
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div>
-                      <span className="text-slate-400 block text-[11px]">Starts</span>
-                      <span className="font-semibold text-slate-800">
+                      <span className="text-text-muted block text-[11px]">Starts</span>
+                      <span className="font-semibold text-text-primary">
                         {formatDisplayDate(event.startDateTime)} at {formatDisplayTime(event.startDateTime)}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[11px]">Ends</span>
-                      <span className="font-semibold text-slate-800">
+                      <span className="text-text-muted block text-[11px]">Ends</span>
+                      <span className="font-semibold text-text-primary">
                         {formatDisplayDate(event.endDateTime)} at {formatDisplayTime(event.endDateTime)}
                       </span>
                     </div>
@@ -539,14 +544,14 @@ export default function ParticipantRegistrationsPage() {
                 </div>
 
                 {/* Venue Details */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
-                  <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                <div className="p-4 rounded-xl bg-background border border-border space-y-2">
+                  <h4 className="font-bold text-text-primary flex items-center gap-1.5">
                     <Building2 className="w-4 h-4 text-emerald-600" />
                     <span>Venue</span>
                   </h4>
                   <div className="pt-1">
-                    <div className="font-semibold text-slate-800">{venue.name || 'Campus Venue'}</div>
-                    <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                    <div className="font-semibold text-text-primary">{venue.name || 'Campus Venue'}</div>
+                    <div className="text-[11px] text-text-muted flex items-center gap-1 mt-0.5">
                       <MapPin className="w-3.5 h-3.5" />
                       <span>{venue.location || 'Location TBA'}</span>
                     </div>
@@ -555,17 +560,17 @@ export default function ParticipantRegistrationsPage() {
 
                 {/* Organizer Info */}
                 {organizer.name && (
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
-                    <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <div className="p-4 rounded-xl bg-background border border-border space-y-1">
+                    <h4 className="font-bold text-text-primary flex items-center gap-1.5">
                       <User className="w-4 h-4 text-indigo-600" />
                       <span>Organizer</span>
                     </h4>
-                    <div className="pt-1 text-slate-800 font-medium">{organizer.name}</div>
+                    <div className="pt-1 text-text-primary font-medium">{organizer.name}</div>
                     {organizer.organization && (
-                      <div className="text-[11px] text-slate-500">{organizer.organization}</div>
+                      <div className="text-[11px] text-text-muted">{organizer.organization}</div>
                     )}
                     {organizer.email && (
-                      <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <div className="text-[11px] text-text-muted flex items-center gap-1">
                         <Mail className="w-3 h-3" />
                         <span>{organizer.email}</span>
                       </div>
@@ -574,8 +579,8 @@ export default function ParticipantRegistrationsPage() {
                 )}
 
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
-                  <span className="font-semibold text-slate-600">Current Academic Year</span>
-                  <span className="font-bold text-slate-800">
+                  <span className="font-semibold text-text-secondary">Current Academic Year</span>
+                  <span className="font-bold text-text-primary">
                     {formatAcademicYear(reg.academicYear)}
                   </span>
                 </div>
@@ -600,11 +605,11 @@ export default function ParticipantRegistrationsPage() {
               </div>
 
               {/* Footer */}
-              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <div className="p-4 bg-background border-t border-border flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => setDetailModalRegistration(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-semibold text-xs hover:bg-slate-100"
+                  className="px-4 py-2 rounded-xl border border-border text-text-secondary font-semibold text-xs hover:bg-surface-subtle"
                 >
                   Close
                 </button>
@@ -619,7 +624,7 @@ export default function ParticipantRegistrationsPage() {
                     }}
                     className={`px-4 py-2 rounded-xl text-xs font-semibold shadow-2xs transition-colors ${
                       eventStarted
-                        ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed select-none'
+                        ? 'bg-surface-subtle text-text-muted border border-border cursor-not-allowed select-none'
                         : 'bg-rose-600 hover:bg-rose-700 text-white'
                     }`}
                   >
@@ -634,23 +639,23 @@ export default function ParticipantRegistrationsPage() {
 
       {/* CANCELLATION CONFIRMATION DIALOG */}
       {cancelModalRegistration && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/40 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-surface rounded-2xl border border-border shadow-2xl w-full max-w-md my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Header */}
-            <div className="p-6 border-b border-slate-100 flex items-start gap-3">
+            <div className="p-6 border-b border-border flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-slate-900">Cancel Registration</h3>
-                <p className="text-xs text-slate-500 mt-1">
+                <h3 className="text-base font-bold text-text-primary">Cancel Registration</h3>
+                <p className="text-xs text-text-muted mt-1">
                   Are you sure you want to cancel your seat for{' '}
-                  <strong className="text-slate-800">{cancelModalRegistration.event?.title || 'this event'}</strong>?
+                  <strong className="text-text-primary">{cancelModalRegistration.event?.title || 'this event'}</strong>?
                 </p>
               </div>
               <button
                 onClick={() => setCancelModalRegistration(null)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-text-muted hover:text-text-secondary p-1"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -665,12 +670,12 @@ export default function ParticipantRegistrationsPage() {
                 </div>
               )}
 
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-text-secondary leading-relaxed">
                 Cancelling will release your reserved seat back to the event capacity. You can re-register later if seats remain open.
               </p>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">
                   Cancellation Reason (Optional)
                 </label>
                 <textarea
@@ -678,18 +683,18 @@ export default function ParticipantRegistrationsPage() {
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   placeholder="e.g., Schedule conflict, illness, or personal commitment..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 resize-none"
+                  className="w-full px-3 py-2 rounded-xl border border-border text-xs text-text-primary focus:outline-hidden focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 resize-none"
                 />
               </div>
             </div>
 
             {/* Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+            <div className="p-4 bg-background border-t border-border flex items-center justify-end gap-2">
               <button
                 type="button"
                 disabled={cancelling}
                 onClick={() => setCancelModalRegistration(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-2xs"
+                className="px-4 py-2 rounded-xl border border-border bg-surface hover:bg-background text-text-secondary font-semibold text-xs shadow-2xs"
               >
                 Keep Reservation
               </button>

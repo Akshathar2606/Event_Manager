@@ -33,6 +33,10 @@ const packageSnapshotSchema = new mongoose.Schema(
       required: [true, 'Minimum order size is required'],
       min: [1, 'Minimum order must be at least 1 person']
     },
+    maxGuests: {
+      type: Number,
+      min: [1, 'Maximum guest capacity must be at least 1 person']
+    },
     menuItems: {
       type: [String],
       default: []

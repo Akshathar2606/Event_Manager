@@ -214,10 +214,10 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 sm:p-8 animate-fadeIn max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-overlay/50 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-surface rounded-2xl border border-border shadow-2xl max-w-xl w-full p-6 sm:p-8 animate-fadeIn max-h-[90vh] flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-start justify-between pb-4 border-b border-slate-100 shrink-0">
+        <div className="flex items-start justify-between pb-4 border-b border-border shrink-0">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -225,17 +225,17 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
                 Venue Booking Request
               </span>
             </div>
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-xl font-extrabold text-text-primary tracking-tight">
               Book {venue.name}
             </h2>
-            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+            <div className="flex items-center gap-2 text-xs text-text-muted mt-0.5">
+              <MapPin className="w-3.5 h-3.5 text-text-muted" />
               <span>{venue.location}</span>
               <span>•</span>
-              <Users className="w-3.5 h-3.5 text-slate-400" />
+              <Users className="w-3.5 h-3.5 text-text-muted" />
               <span>{venue.capacity.toLocaleString()} Capacity</span>
               <span>•</span>
-              <DollarSign className="w-3.5 h-3.5 text-slate-400" />
+              <DollarSign className="w-3.5 h-3.5 text-text-muted" />
               <span>{venue.hourlyRate > 0 ? `$${venue.hourlyRate}/hr` : 'Free'}</span>
             </div>
           </div>
@@ -243,7 +243,7 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg disabled:opacity-50"
+            className="text-text-muted hover:text-text-secondary p-1.5 rounded-lg disabled:opacity-50"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
@@ -260,7 +260,7 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-sm">
+                  <h3 className="font-bold text-text-primary text-sm">
                     Booking Request Submitted!
                   </h3>
                   <p className="text-xs text-emerald-800">
@@ -268,7 +268,7 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
                   </p>
                 </div>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed bg-white/80 p-3 rounded-xl border border-emerald-100">
+              <p className="text-xs text-text-secondary leading-relaxed bg-surface/80 p-3 rounded-xl border border-emerald-100">
                 Your reservation request for <strong>{venue.name}</strong> covering event <strong>&quot;{selectedEvent?.title}&quot;</strong> has been sent to campus administration. You will be notified once reviewed.
               </p>
               <div className="pt-2 flex justify-end">
@@ -308,11 +308,11 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
 
               {/* Event Picker */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1.5">
                   Select Event to Host <span className="text-rose-500">*</span>
                 </label>
                 {eventsLoading ? (
-                  <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500">
+                  <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-xl text-xs text-text-muted">
                     <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
                     <span>Loading your eligible events...</span>
                   </div>
@@ -335,7 +335,7 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
                   <select
                     value={selectedEventId}
                     onChange={handleEventChange}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     required
                   >
                     <option value="">-- Choose an Event --</option>
@@ -361,14 +361,14 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
 
               {/* Event Info Callout */}
               {selectedEvent && (
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs text-slate-600">
+                <div className="p-3 bg-background rounded-xl border border-border space-y-2 text-xs text-text-secondary">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800">{selectedEvent.title}</span>
-                    <span className="capitalize px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200/60 text-slate-700">
+                    <span className="font-semibold text-text-primary">{selectedEvent.title}</span>
+                    <span className="capitalize px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-muted text-text-secondary">
                       {selectedEvent.category} • {selectedEvent.status}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-text-muted text-[11px]">
                     <Clock className="w-3.5 h-3.5 text-indigo-500" />
                     <span>
                       Event Scheduled: {formatDisplayDate(selectedEvent.startDateTime)} – {formatDisplayDate(selectedEvent.endDateTime)}
@@ -410,33 +410,33 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
               {/* Start & End Date Inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">
                     Booking Start Time <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="datetime-local"
                     value={startDateTime}
                     onChange={(e) => setStartDateTime(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     required
                   />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  <span className="text-[10px] text-text-muted mt-0.5 block">
                     Must be on or before event start
                   </span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">
                     Booking End Time <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="datetime-local"
                     value={endDateTime}
                     onChange={(e) => setEndDateTime(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-surface text-text-primary focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     required
                   />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  <span className="text-[10px] text-text-muted mt-0.5 block">
                     Must be on or after event end
                   </span>
                 </div>
@@ -445,10 +445,10 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
               {/* Purpose */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider">
                     Purpose of Reservation
                   </label>
-                  <span className="text-[10px] text-slate-400">{purpose.length}/1000</span>
+                  <span className="text-[10px] text-text-muted">{purpose.length}/1000</span>
                 </div>
                 <input
                   type="text"
@@ -456,17 +456,17 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
                   value={purpose}
                   onChange={(e) => setPurpose(e.target.value)}
                   placeholder="e.g. Annual Technical Keynote and Project Demonstrations"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-surface text-text-primary placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
               </div>
 
               {/* Additional Notes */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider">
                     Equipment & Setup Notes
                   </label>
-                  <span className="text-[10px] text-slate-400">{notes.length}/1000</span>
+                  <span className="text-[10px] text-text-muted">{notes.length}/1000</span>
                 </div>
                 <textarea
                   rows={2}
@@ -474,17 +474,17 @@ export default function RequestBookingModal({ venue, isOpen, onClose, onSuccess 
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="e.g. Requires projector, wireless podium microphones, and 30 minutes early access for AV testing."
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-surface text-text-primary placeholder:text-text-muted focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
                 />
               </div>
 
               {/* Modal Footer Controls */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
+              <div className="pt-3 border-t border-border flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={submitting}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text-primary bg-surface-subtle hover:bg-surface-muted rounded-xl transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>

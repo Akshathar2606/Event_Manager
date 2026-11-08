@@ -8,19 +8,19 @@ export default function NotFoundPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center py-12 px-4 text-center">
-      <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+    <div className="min-h-screen bg-background flex flex-col justify-center items-center py-12 px-4 text-center">
+      <div className="max-w-md w-full bg-surface p-8 rounded-2xl border border-border shadow-sm">
         <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center mx-auto mb-4">
           <HelpCircle className="w-7 h-7" />
         </div>
 
-        <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 mb-2">
+        <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-surface-subtle text-text-secondary mb-2">
           404 Not Found
         </span>
 
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Page Not Found</h1>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Page Not Found</h1>
 
-        <p className="mt-3 text-sm text-slate-500 leading-relaxed">
+        <p className="mt-3 text-sm text-text-muted leading-relaxed">
           The page or resource you are looking for does not exist or has been relocated.
         </p>
 
