@@ -40,9 +40,9 @@ const startServer = async () => {
     await PasswordRecoveryAttempt.init();
     await ReminderJob.init();
 
-    const server = app.listen(PORT, () => {
-      console.log(`[EventFlow Server] Running on port ${PORT} in ${NODE_ENV} mode`);
-    });
+    const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[EventFlow Server] Running on port ${PORT} in ${NODE_ENV} mode`);
+});
     const reminderScheduler = startReminderScheduler({ app });
     let shuttingDown = false;
 
