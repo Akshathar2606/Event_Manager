@@ -3,7 +3,16 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 
 const app = express();
+// Temporary HTTP request logger for deployment debugging
+app.use((req, res, next) => {
+  console.log(`[HTTP REQUEST] ${req.method} ${req.originalUrl}`);
 
+  res.on('finish', () => {
+    console.log(`[HTTP RESPONSE] ${req.method} ${req.originalUrl} - ${res.statusCode}`);
+  });
+
+  next();
+});
 // Standard middleware
 const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:5173',
